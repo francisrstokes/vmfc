@@ -1,0 +1,18 @@
+.data
+  name bytes 0x32,0x45,0x66
+  nameTwo ascii abcdefg hijklmnop
+
+.start
+
+:whatever-dogg
+  PUSH 0x42
+  PUSH {label-name}
+  ADD
+  PUSH [dataItem]
+  JMP {whatever-dogg}
+  SSP [name2]
+  PUSH {some-routine}
+  CALL
+
+:some-routine
+RET
