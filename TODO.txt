@@ -1,0 +1,29 @@
+[x] Finish ret instruction
+[x] Implement reads and writes as method
+[x] Reimplement all pushes/pops using the actual push/pop methods
+
+- Create a full memory space, shared by the program and the stack
+- Implement addressing instructions
+  - MOV instructions (from address to address, from address to stack base ptr + offset etc)
+- Assembler that can define sections and created specialised binarys
+- C-like language that can be used to write code for the VirtualMachineConsole
+
+
+A +-----------------+ 0x0000
+  |                 |
+  |      Data       |
+  |                 |
+B +-----------------+ 0x5555
+  |                 |
+  |  Program Code   |
+  |                 |
+C +-----------------+ 0xAAAA
+  |                 |
+  |      Stack      |
+  |                 |
+D +-----------------+ 0xFFFF
+
+A - Always 0x0000
+B - Dependent on amount of statically assigned Data
+C - Stack can by default start at 0xAAAA, but perhaps be configurable at a laster stage
+D - Always 0xFFFF

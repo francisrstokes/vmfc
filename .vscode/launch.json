@@ -1,0 +1,17 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+        "type": "node",
+        "request": "launch",
+        "name": "Debug File",
+        "program": "${file}"
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Debug Sepcific File",
+      "program": "${command:pickFile}"
+  }
+  ]
+}

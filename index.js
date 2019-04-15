@@ -19,6 +19,8 @@ const JMP   = 0x12; // Set the instruction pointer
 const SSP   = 0x13; // Set the stack pointer
 const HALT  = 0xFF; // Halt the program and write the result to the screen
 
+const DBG   = 0xFE; // Debug will force a breakpoint in debug mode
+
 class StackMachine {
   constructor(stackSize, programSize) {
     this.stack = new ArrayBuffer(stackSize);
@@ -27,16 +29,20 @@ class StackMachine {
     this.stackView = new DataView(this.stack);
     this.programView = new DataView(this.programSpace);
 
-    this.ip = 0;
-    this.sp = 0;
+    this.ip = 0; // Instruction Pointer
+    this.sp = 0; // Stack Pointer
+    this.fp = 0; // Stack Frame Pointer
+    this.fs = 0; // Stack Frame Size
   }
 
   load(program) {
-    program.forEach((u16, i) => this.programView.setInt16(i, u16));
+    for (let i = 0; i < program.length; i++) {
+      this.programView.setUint16(i * 2, program[i]);
+    }
   }
 
   fetch() {
-    return this.programView.getUint16(this.ip++);
+    return this.programView.getUint16(2 * this.ip++);
   }
 
   run() {
@@ -44,86 +50,168 @@ class StackMachine {
   }
 
   debugStack() {
-    const low = Math.max(0, this.sp - 5);
-    const high = Math.min(this.stack.byteLength, this.sp + 5);
+    const low = Math.max(0, this.sp - 10);
+    const high = Math.min(this.stack.byteLength, this.sp + 10);
 
     // console.log(`SP:\t${this.sp}`);
     Array.from({length: high - low}, (_, i) => {
       const cur = low + i;
-      const ptr = this.sp === cur ? '\t<' : '';
-      console.log(`${cur}:\t${this.stackView.getUint16(cur)}${ptr}`);
+      const ptr = this.sp === cur
+        ? '\t< - SP'
+        : this.fp === cur
+          ? '\t< - FP'
+          : '';
+
+      console.log(`${cur}:\t${this.readU16(cur * 2)}${ptr}`);
     });
     console.log('');
+  }
+
+  readU16(address) {
+    return this.stackView.getUint16(address * 2);
+  }
+
+  writeU16(address, value) {
+    return this.stackView.setUint16(address * 2, value);
+  }
+
+  pop() {
+    const value = this.readU16(this.sp--);
+    this.fs--;
+    return value;
+  }
+
+  push(value) {
+    this.writeU16(++this.sp, value);
+    this.fs++;
   }
 
   step() {
     const opcode = this.fetch();
     switch (opcode) {
+      case DBG: {
+        this.debugStack();
+        debugger;
+        break;
+      }
       case PUSH: {
-        const value = this.fetch();
-        this.stackView.setUint16(++this.sp, value);
+        this.push(this.fetch());
         break;
       }
       case PIP: {
-        this.stackView.setUint16(++this.sp, this.ip);
+        this.push(this.ip);
         break;
       }
       case PSP: {
-        this.stackView.setUint16(++this.sp, this.sp);
+        this.push(this.sp);
         break;
       }
+
+
+      /*
+        Stack before:
+        -------------
+
+        | fn addr       | < SP
+        | n args        |
+        | arg n         |
+        | arg n-1       |
+        | ...           |
+        | arg 0         |
+        | stack value 1 |
+        | stack value 2 | < FP (bottom of stack)
+        |---------------|
+
+        Stack after:
+        ------------
+
+        | arg n         | < SP
+        | arg n-1       |
+        | ...           |
+        | arg 0         |
+        |---------------|
+        | return addr   | < FP
+        | frame size    |
+        |---------------|
+        | stack value 1 |
+        | stack value 2 |
+        |---------------| (bottom of stack)
+      */
       case CALL: {
         const returnAddress = this.ip;
-        const jmpAddress = this.stackView.getUint16(this.sp);
-        const swapValue = this.stackView.getUint16(this.sp - 1);
+        const jmpAddress = this.pop();
+        const nArgs = this.pop();
+        let args = [];
+        for (let i = 0; i < nArgs; i++) {
+          args.push(this.pop());
+        }
 
-        this.stackView.setUint16(this.sp - 1, returnAddress);
-        this.stackView.setUint16(this.sp, swapValue);
+        this.push(this.fs);
+        this.push(returnAddress);
+        this.fp = this.sp;
+        this.fs = 0;
+
+        args.forEach(arg => this.push(arg));
         this.ip = jmpAddress;
         break;
       }
+
+      // . Get return value (last value on the stack)
+      // . Get the return address that's pointed to by the frame pointer
+      // . Get the frame size below
+      // . Set the stack pointer to (fp - 2)
+      // . Set the frame pointer (fp - 2 - fs)
+      // . Set the frame size to fs
+      // . Set ip to return address
       case RET: {
-        const curValue = this.stackView.getUint16(this.sp--);
-        this.ip = this.stackView.getUint16(this.sp);
-        this.stackView.setUint16(this.sp, curValue);
+        const returnValue = this.readU16(this.sp);
+        const returnAddress = this.readU16(this.fp);
+        const frameSize = this.readU16(this.fp - 1);
+
+        this.sp = this.fp - 2;
+        this.fp = this.so - frameSize;
+        this.fs = frameSize;
+        this.ip = returnAddress;
+
+        this.push(returnValue);
         break;
       }
       case ADD: {
-        const a = this.stackView.getUint16(this.sp--);
-        const b = this.stackView.getUint16(this.sp);
-        this.stackView.setUint16(this.sp, a + b);
+        const a = this.pop();
+        const b = this.pop();
+        this.push(a + b);
         break;
       }
       case SUB: {
-        const a = this.stackView.getUint16(this.sp--);
-        const b = this.stackView.getUint16(this.sp);
-        this.stackView.setUint16(this.sp, a - b);
+        const a = this.pop();
+        const b = this.pop();
+        tthis.push(a - b);
         break;
       }
       case MUL: {
-        const a = this.stackView.getUint16(this.sp--);
-        const b = this.stackView.getUint16(this.sp);
-        this.stackView.setUint16(this.sp, a * b);
+        const a = this.pop();
+        const b = this.pop();
+        tthis.push(a * b);
         break;
       }
       case LSF: {
-        const s = this.stackView.getUint16(this.sp--);
-        const v = this.stackView.getUint16(this.sp);
-        this.stackView.setUint16(this.sp, v << s);
+        const s = this.pop();
+        const v = this.pop();
+        this.push(v << s);
         break;
       }
       case RSF: {
-        const s = this.stackView.getUint16(this.sp--);
-        const v = this.stackView.getUint16(this.sp);
-        this.stackView.setUint16(this.sp, v >> s);
+        const s = this.pop();
+        const v = this.pop();
+        this.push(v >> s);
         break;
       }
       case INC: {
-        this.stackView.setUint16(this.sp, this.stackView.getUint16(this.sp) + 1);
+        this.writeU16(this.sp, this.readU16(this.sp) + 1);
         break;
       }
       case DEC: {
-        this.stackView.setUint16(this.sp, this.stackView.getUint16(this.sp) - 1);
+        this.writeU16(this.sp, this.readU16(this.sp) - 1);
         break;
       }
       case ISP: {
@@ -143,40 +231,53 @@ class StackMachine {
         break;
       }
       case JNZ: {
-        const jmpAddress = this.stackView.getUint16(this.sp--);
-        const checkValue = this.stackView.getUint16(this.sp);
+        const jmpAddress = this.readU16(this.sp--);
+        const checkValue = this.readU16(this.sp);
         if (checkValue !== 0) {
           this.ip = jmpAddress;
         }
         break;
       }
       case HALT: {
-        console.log(this.stackView.getUint16(this.sp));
+        console.log(this.readU16(this.sp));
         return true;
       }
     }
   }
 }
 
-const STACK_SIZE = 1024;
-const PROGRAM_SIZE = 1024;
+const STACK_SIZE = 0xFFFF;
+const PROGRAM_SIZE = 0xFFFF;
 const machine = new StackMachine(STACK_SIZE, PROGRAM_SIZE);
 
-machine.load(new Uint16Array([
-  PUSH, 0x05,
-  CALL,
 
-  DEC,
-  RET,
+const program = new Uint16Array([
+  // Variables for this stack frame
+  /* 1 */ PUSH, 0x01,
+  /* 3 */ PUSH, 0x02,
+  /* 5 */ PUSH, 0x03,
+  /* 7 */ PUSH, 0x04,
+  /* 9 */ PUSH, 0x05,
+  /* 10 */ DBG,
 
-  PUSH, 0x0F,
-  PUSH, 0x03,
-  CALL,
-  PUSH, 0x07,
-  JNZ,
-  DEC,
-  HALT
-]));
+  // Now make a call using calling convention
+  /* 12 */ PUSH, 0x6, // Arg 1
+  /* 14 */ PUSH, 0x7, // Arg 2
+  /* 16 */ PUSH, 0x2, // Number of args
+  /* 18 */ PUSH, 0x16, // Address
+  /* 19 */ DBG,
+  /* 20 */ CALL,
+
+  /* 21 */ HALT,
+
+  /* 22 */ ADD,
+  /* 24 */ PUSH, 0x1,
+  /* 25 */ ADD,
+  /* 26 */ DBG,
+  /* 27 */ RET,
+]);
+
+machine.load(program);
 
 machine.run();
 
