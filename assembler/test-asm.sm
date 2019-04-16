@@ -1,18 +1,25 @@
+;; Comments at the beginning!
 .data
+  ;; Comment about this dataline
   name bytes 0x32,0x45,0x66
+
+  ;; Comment about another dataLine
   nameTwo ascii abcdefg hijklmnop
 
-.start
+.code
 
+;; This is a comment about something
+;; This is another one
 :whatever-dogg
+  ;; comment
   PUSH 0x42
   PUSH {label-name}
   ADD
   PUSH [dataItem]
   JMP {whatever-dogg}
-  SSP [name2]
+  SSP [name]
   PUSH {some-routine}
   CALL
 
 :some-routine
-RET
+  RET

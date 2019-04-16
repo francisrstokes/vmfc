@@ -5,6 +5,8 @@ const {
   whitespace,
   possibly,
   many,
+  many1,
+  choice,
   namedSequenceOf,
   sepBy,
   everythingUntil,
@@ -15,7 +17,8 @@ const {
   newline,
   Whitespace,
   hex16,
-  doParser
+  doParser,
+  comment
 } = require('./common');
 
 const dataLineSpecific = doParser(function* () {
@@ -46,10 +49,14 @@ const dataLine = namedSequenceOf([
 
 module.exports = sequenceOf([
   whitespace,
+  many(choice([ comment, newline ])),
   str('.data'),
-  sequenceOf([ possibly(Whitespace), newline ]),
-  many(dataLine)
+  sequenceOf([ possibly(Whitespace), many1(newline) ]),
+  many(choice([
+    dataLine,
+    comment
+  ])).map(matches => matches.filter(match => match.type !== 'comment'))
 ]).map(parsed => ({
   type: 'data-section',
-  section: parsed[3]
+  section: parsed[4]
 }));

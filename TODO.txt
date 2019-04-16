@@ -1,12 +1,18 @@
 [x] Finish ret instruction
 [x] Implement reads and writes as method
 [x] Reimplement all pushes/pops using the actual push/pop methods
+[x] Create a full memory space, shared by the program and the stack
+[x] Implement addressing instructions
 
-- Create a full memory space, shared by the program and the stack
-- Implement addressing instructions
-  - MOV instructions (from address to address, from address to stack base ptr + offset etc)
+- Memory mapper
+  - When a read or a write happens, the memory mapper can intercept it, and choose to either perform the normal op
+    or to do something else
+- Binary that describes entry point
+- Real program loader: read header, set data, write program code, set size of stack, code region etc
 - Assembler that can define sections and created specialised binarys
 - C-like language that can be used to write code for the VirtualMachineConsole
+- 8 bit opcodes / unaligned data in binary
+  - Example: 0xff01 0xffff -> PUSH 0xffff, HALT
 
 
 A +-----------------+ 0x0000
@@ -25,5 +31,5 @@ D +-----------------+ 0xFFFF
 
 A - Always 0x0000
 B - Dependent on amount of statically assigned Data
-C - Stack can by default start at 0xAAAA, but perhaps be configurable at a laster stage
+C - Soft/hard cutoff point
 D - Always 0xFFFF
