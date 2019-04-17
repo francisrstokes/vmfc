@@ -137,7 +137,7 @@ const generator = ast => {
   header.get('rodataPtr').set(finalExecutable.getDeepOffset('body.rodata'));
   header.get('dataPtr').set(finalExecutable.getDeepOffset('body.data'));
   header.get('codePtr').set(finalExecutable.getDeepOffset('body.code'));
-  header.get('codeLength').set(code.computeBufferSize());
+  header.get('codeLength').set(finalExecutable.getDeep('body.code').computeBufferSize());
 
   return finalExecutable.toBuffer();
 }

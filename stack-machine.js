@@ -1,5 +1,31 @@
 const instructions = require('./instructions');
 
+const validateMagicNumber = view => view.getUint32(0) === 0x564d4643;
+
+const getHeaderInformation = view => ({
+  roPtr: view.getUint16(4),
+  roLength: view.getUint16(6),
+  dataPtr: view.getUint16(8),
+  dataLength: view.getUint16(10),
+  codePtr: view.getUint16(12),
+  codeLength: view.getUint16(14),
+});
+
+const debugArrayBufferView = (view, limit) => {
+  const padZero = (n, zeros = 2) => ("0".repeat(zeros) + n.toString(16)).slice(-zeros);
+  let line = '          00 01 02 03 04 05 06 07 08 09 0A 0B 0C 0D 0E 0F\n';
+  line    += '-------|-------------------------------------------------\n'
+  let offset = 0;
+  while (offset < limit) {
+    if (offset % 16 === 0) {
+      line += `${offset > 0 ? '\n' : ''}0x${padZero(offset, 4)} |  `;
+    }
+    line += padZero(view.getUint8(offset)) + ' ';
+    offset++;
+  }
+  console.log(line)
+}
+
 const MEMORY_SIZE = 0xFFFF;
 class StackMachine {
   constructor() {
@@ -13,9 +39,37 @@ class StackMachine {
   }
 
   load(program) {
-    for (let i = 0; i < program.length; i++) {
-      this.memoryView.setUint16(i * 2, program[i]);
+    const view = new DataView(program);
+
+    if (!validateMagicNumber(view)) {
+      throw new Error('Invalid VMFC Binary');
     }
+
+    const headerInfo = getHeaderInformation(view);
+
+    debugArrayBufferView(view, program.byteLength-1);
+
+    for (let i = 0; i < headerInfo.roLength; i += 2) {
+      const address = i;
+      const value = view.getUint16(address, true);
+      this.memoryView.setUint16(address - headerInfo.roPtr, value);
+    }
+
+    for (let i = 0; i < headerInfo.dataLength; i += 2) {
+      const address = headerInfo.dataPtr + i;
+      const value = view.getUint16(address, true);
+      const offset = address - headerInfo.roPtr;
+      this.memoryView.setUint16(offset, value);
+    }
+
+    for (let i = 0; i < headerInfo.codeLength; i += 2) {
+      const address = headerInfo.codePtr + i;
+      const value = view.getUint16(address, true);
+      const offset = address - headerInfo.dataPtr;
+      this.memoryView.setUint16(offset, value);
+    }
+
+    this.ip = headerInfo.roLength + headerInfo.dataLength;
   }
 
   fetch16() {
@@ -139,10 +193,10 @@ class StackMachine {
         | arg n-1       |
         | ...           |
         | arg 0         |
-        |---------------|
+        |===============|
         | return addr   | < FP
         | frame size    |
-        |---------------|
+        |===============|
         | stack value 1 |
         | stack value 2 |
         |---------------| (bottom of stack)
@@ -238,6 +292,10 @@ class StackMachine {
       }
       case instructions.DIP: {
         this.ip -= 2;
+        break;
+      }
+      case instructions.JMP: {
+        this.ip = this.pop();
         break;
       }
       case instructions.JNZ: {

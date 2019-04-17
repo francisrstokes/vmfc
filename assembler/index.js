@@ -12,7 +12,10 @@ fs.readFile(filepath, 'utf8', (_, file) => {
 
   validator(ast);
 
-  const gen = generator(ast);
+  const binary = generator(ast);
 
-  console.log(JSON.stringify(ast, null, '  '));
+  fs.writeFile(path.join(__dirname, '../test.bin'), binary, () => {
+    console.log('Done');
+  });
+  // console.log(JSON.stringify(ast, null, '  '));
 });
