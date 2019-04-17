@@ -47,7 +47,7 @@ const dataLine = namedSequenceOf([
   ['_', newline]
 ]).map(({name, data: {type, data}}) => ({name, type, data}))
 
-module.exports = sequenceOf([
+const dataParser = sequenceOf([
   whitespace,
   many(choice([ comment, newline ])),
   str('.data'),
@@ -60,3 +60,22 @@ module.exports = sequenceOf([
   type: 'data-section',
   section: parsed[4]
 }));
+
+const roDataParser = sequenceOf([
+  whitespace,
+  many(choice([ comment, newline ])),
+  str('.rodata'),
+  sequenceOf([ possibly(Whitespace), many1(newline) ]),
+  many(choice([
+    dataLine,
+    comment
+  ])).map(matches => matches.filter(match => match.type !== 'comment'))
+]).map(parsed => ({
+  type: 'rodata-section',
+  section: parsed[4]
+}));
+
+module.exports = {
+  dataParser,
+  roDataParser
+};

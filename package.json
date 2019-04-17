@@ -1,0 +1,15 @@
+{
+  "name": "stack-machine",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Francis Stokes",
+  "license": "MIT",
+  "dependencies": {
+    "arcsecond": "^1.3.0",
+    "construct-js": "^0.1.0"
+  }
+}

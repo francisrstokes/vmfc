@@ -6,7 +6,7 @@ const {
   many1,
   takeLeft,
   many,
-  sepBy1,
+  namedSequenceOf,
   everythingUntil,
   sequenceOf,
   whitespace
@@ -26,12 +26,18 @@ const commentNoNewline = sequenceOf([
 
 const comment = takeLeft(commentNoNewline)(newline);
 
-const comments = sepBy1(newline)(comment);
 const possibleComments = many(
   takeLeft(comment)(newlines)
 );
 
 const doParser = gen => Do(gen, Parser);
+
+const sequencedNamed = parsers => namedSequenceOf(
+  parsers.map(p => Array.isArray(p) ? p : ['_ARCSECOND_IGNORED__', p])
+).map(v => {
+  delete v._ARCSECOND_IGNORED__;
+  return v;
+});
 
 module.exports = {
   newline,
@@ -41,6 +47,6 @@ module.exports = {
   hex16,
   comment,
   commentNoNewline,
-  comments,
-  possibleComments
+  possibleComments,
+  sequencedNamed
 };

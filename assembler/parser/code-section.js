@@ -41,54 +41,33 @@ const basicArgument = takeLeft(choice([
     letters,
     char(']')
   ]).map(([_, name]) => ({ type: 'data-address-reference', value: name })),
-  sequenceOf([
-    str('*['),
-    letters,
-    char(']')
-  ]).map(([_, name]) => ({ type: 'data-value-reference', value: name })),
+
   sequenceOf([
     char('{'),
     validLabel,
     char('}')
   ]).map(([_, name]) => ({ type: 'label-address-reference', value: name })),
+
   hex16.map(value => ({ type: 'literal-value', value }))
 ])) (possibly(Whitespace));
 
-const additionArgument = takeLeft(
+const arithmeticArgument = takeLeft(
   sequencedNamed([
     char('<'),
       ['arg1', basicArgument],
-    char('+'),
+      ['operator', regex(/^[+\-]/)],
     Whitespace,
       ['arg2', basicArgument],
     char('>')
-  ]).map(({arg1, arg2}) => ({
-    type: 'argument-addition',
+  ]).map(({arg1, arg2, operator}) => ({
+    type: 'argument-arithmetic',
     arg1,
     arg2,
+    operator
   }))
 ) (possibly(Whitespace));
 
-const subtractionArgument = takeLeft(
-  sequencedNamed([
-    char('<'),
-      ['arg1', basicArgument],
-    char('-'),
-    Whitespace,
-      ['arg2', basicArgument],
-    char('>')
-  ]).map(({arg1, arg2}) => ({
-    type: 'argument-subtraction',
-    arg1,
-    arg2,
-  }))
-) (possibly(Whitespace));
-
-const argument = choice([
-  additionArgument,
-  subtractionArgument,
-  basicArgument,
-]);
+const argument = choice([ arithmeticArgument, basicArgument ]);
 
 const singleInstruction = instruction =>
   sequenceOf([
@@ -122,6 +101,7 @@ const argumentInstruction = instruction =>
 const codeSectionItem = takeLeft(choice([
   commentNoNewline,
   label,
+  argumentInstruction('push'),
   singleInstruction('add'),
   singleInstruction('pip'),
   singleInstruction('psp'),
@@ -136,12 +116,12 @@ const codeSectionItem = takeLeft(choice([
   singleInstruction('iip'),
   singleInstruction('dip'),
   singleInstruction('halt'),
-  argumentInstruction('push'),
-  argumentInstruction('jnz'),
-  argumentInstruction('jmp'),
-  argumentInstruction('ssp'),
-  argumentInstruction('lsf'),
-  argumentInstruction('rsf')
+  singleInstruction('dbg'),
+  singleInstruction('jnz'),
+  singleInstruction('jmp'),
+  singleInstruction('ssp'),
+  singleInstruction('lsf'),
+  singleInstruction('rsf'),
 ])) (newlines);
 
 
