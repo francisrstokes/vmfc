@@ -1,4 +1,4 @@
-const instructions = require('./instructions');
+const instructions = require('../../src/instructions');
 
 const {
   Struct,
@@ -46,11 +46,10 @@ const fillCodeSection = (codeSection, struct, ast) => {
       currentLabelStruct = Struct(element.value);
       struct.field(element.value, currentLabelStruct);
     } else {
-      const instructionStruct = Struct(element.kind)
-          .field('opcode', U16(instructions[element.kind].opcode));
+      const opcode = instructions[element.kind.toUpperCase()];
+      const instructionStruct = Struct(element.kind).field('opcode', U16(opcode));
 
-      // Push is a special case
-      if (element.kind === 'push') {
+      if (element.argument) {
         instructionStruct.field('argument', U16(0));
       }
 
@@ -123,10 +122,8 @@ const generator = ast => {
   }
 
   ast.code.section.forEach(element => {
-    if (element.type === 'instruction') {
-      if (element.kind === 'push') {
-        element.struct.get('argument').set(resolveArgument(element.argument));
-      }
+    if (element.type === 'instruction' && element.argument) {
+      element.struct.get('argument').set(resolveArgument(element.argument));
     }
   });
 

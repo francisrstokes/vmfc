@@ -18,8 +18,21 @@ const JNZ   = 0x11; // Jump if not zero
 const JMP   = 0x12; // Set the instruction pointer
 const SSP   = 0x13; // Set the stack pointer
 const PMS   = 0x14; // Push memory to stack
-const PMF   = 0x16; // Push memory to fp + offset
-const MSM   = 0x15; // Move stack to memory
+const PMF   = 0x15; // Push memory to fp + offset
+const MSM   = 0x16; // Move stack to memory
+const CPS   = 0x17; // Push value from (fp - offset) to top of stack
+const SMV   = 0x18; // Move value at top of stack to (fp - offset)
+const JEQ   = 0x19; // Jump if equal
+const JNE   = 0x1A; // Jump if not equal
+const JGT   = 0x1B; // Jump if greater than equal
+const JLT   = 0x1C; // Jump if less than equal
+const JGE   = 0x1D; // Jump if greater than or equal
+const JLE   = 0x1E; // Jump if less than or equal
+const AND   = 0x1F; // Logical and
+const OR    = 0x20; // Logical or
+const XOR   = 0x21; // Logical xor
+const NOT   = 0x22; // Logical not
+
 
 const HALT  = 0xFF; // Halt the program and write the result to the screen
 const DBG   = 0xFE; // Debug will force a breakpoint in debug mode
@@ -48,6 +61,18 @@ module.exports = {
   PMS,
   MSM,
   PMF,
+  CPS,
+  SMV,
+  JEQ,
+  JNE,
+  JGT,
+  JLT,
+  JGE,
+  JLE,
+  AND,
+  OR,
+  XOR,
+  NOT,
 
   HALT,
   DBG,

@@ -39,6 +39,8 @@ const sequencedNamed = parsers => namedSequenceOf(
   return v;
 });
 
+
+
 module.exports = {
   newline,
   newlines,
@@ -48,5 +50,6 @@ module.exports = {
   comment,
   commentNoNewline,
   possibleComments,
-  sequencedNamed
+  sequencedNamed,
+  spaces: Whitespace
 };

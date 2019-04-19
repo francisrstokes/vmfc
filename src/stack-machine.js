@@ -1,6 +1,9 @@
 const instructions = require('./instructions');
 
-const validateMagicNumber = view => view.getUint32(0) === 0x564d4643;
+const validateMagicNumber = view => {
+  console.log(`Magic Number: 0x${view.getUint32(0).toString(16)}`)
+  return view.getUint32(0) === 0x564d4643;
+}
 
 const getHeaderInformation = view => ({
   roPtr: view.getUint16(4),
@@ -11,13 +14,13 @@ const getHeaderInformation = view => ({
   codeLength: view.getUint16(14),
 });
 
-const debugArrayBufferView = (view, limit) => {
+const debugArrayBufferView = (view, limit, start = 0) => {
   const padZero = (n, zeros = 2) => ("0".repeat(zeros) + n.toString(16)).slice(-zeros);
   let line = '          00 01 02 03 04 05 06 07 08 09 0A 0B 0C 0D 0E 0F\n';
   line    += '-------|-------------------------------------------------\n'
-  let offset = 0;
-  while (offset < limit) {
-    if (offset % 16 === 0) {
+  let offset = start;
+  while (offset < start + limit) {
+    if ((offset - start) % 16 === 0) {
       line += `${offset > 0 ? '\n' : ''}0x${padZero(offset, 4)} |  `;
     }
     line += padZero(view.getUint8(offset)) + ' ';
@@ -38,6 +41,21 @@ class StackMachine {
     this.fs = 0; // Stack Frame Size
   }
 
+  debugArrayBufferView(view, limit, start = 0) {
+    const padZero = (n, zeros = 2) => ("0".repeat(zeros) + n.toString(16)).slice(-zeros);
+    let line = '          00 01 02 03 04 05 06 07 08 09 0A 0B 0C 0D 0E 0F\n';
+    line    += '-------|-------------------------------------------------\n'
+    let offset = start;
+    while (offset < start + limit) {
+      if ((offset - start) % 16 === 0) {
+        line += `${offset > 0 ? '\n' : ''}0x${padZero(offset, 4)} |  `;
+      }
+      line += padZero(view.getUint8(offset)) + ' ';
+      offset++;
+    }
+    console.log(line)
+  }
+
   load(program) {
     const view = new DataView(program);
 
@@ -47,7 +65,8 @@ class StackMachine {
 
     const headerInfo = getHeaderInformation(view);
 
-    debugArrayBufferView(view, program.byteLength-1);
+    console.log(`\nHexdump`)
+    debugArrayBufferView(view, program.byteLength);
 
     for (let i = 0; i < headerInfo.roLength; i += 2) {
       const address = i;
@@ -70,6 +89,13 @@ class StackMachine {
     }
 
     this.ip = headerInfo.roLength + headerInfo.dataLength;
+
+    // Set up stack
+    this.fp -= 2;
+    this.sp -= 2;
+
+    console.log('Machine start');
+    this.debugStack();
   }
 
   fetch16() {
@@ -89,6 +115,7 @@ class StackMachine {
   }
 
   debugStack() {
+    console.log('\n');
     const low = Math.max(0, this.sp - 10);
     const high = Math.min(this.memory.byteLength - 2, this.sp + 10);
 
@@ -143,14 +170,12 @@ class StackMachine {
         break;
       }
       case instructions.PMS: {
-        const address = this.fetch16();
-        const value = this.readU16(address);
-        this.push(value);
+        this.push(this.readU16(this.pop()));
         break;
       }
       case instructions.PMF: {
-        const address = this.fetch16();
-        const offset = this.fetch16();
+        const address = this.pop();
+        const offset = this.pop();
         const value = this.readU16(address);
         this.writeU16(this.fp + offset, value);
         break;
@@ -165,9 +190,22 @@ class StackMachine {
       }
 
       case instructions.MSM: {
-        const address = this.fetch16();
+        const address = this.pop();
         const value = this.readU16(this.sp);
         this.writeU16(address, value);
+        break;
+      }
+
+      case instructions.CPS: {
+        const offset = this.fetch16();
+        this.push(this.readU16(this.fp - offset));
+        break;
+      }
+
+      case instructions.SMV: {
+        const offset = this.fetch16();
+        const value = this.pop();
+        this.writeU16(this.fp - offset, value);
         break;
       }
 
@@ -202,12 +240,14 @@ class StackMachine {
         |---------------| (bottom of stack)
       */
       case instructions.CALL: {
+        console.log('Call Start');
+        this.debugStack();
         const returnAddress = this.ip;
         const jmpAddress = this.pop();
         const nArgs = this.pop();
         let args = [];
         for (let i = 0; i < nArgs; i++) {
-          args.push(this.pop());
+          args.unshift(this.pop());
         }
 
         this.push(this.fs);
@@ -217,6 +257,8 @@ class StackMachine {
 
         args.forEach(arg => this.push(arg));
         this.ip = jmpAddress;
+        console.log('Call End');
+        this.debugStack();
         break;
       }
 
@@ -228,16 +270,20 @@ class StackMachine {
       // . Set the frame size to fs
       // . Set ip to return address
       case instructions.RET: {
+        console.log('Return start');
+        this.debugStack();
         const returnValue = this.readU16(this.sp);
         const returnAddress = this.readU16(this.fp);
         const frameSize = this.readU16(this.fp + 2);
 
-        this.sp = this.fp + 2;
-        this.fp = this.so + frameSize;
+        this.sp = this.fp + 4;
+        this.fp = this.sp + frameSize;
         this.fs = frameSize;
         this.ip = returnAddress;
 
         this.push(returnValue);
+        console.log('Return end');
+        this.debugStack();
         break;
       }
       case instructions.ADD: {
@@ -249,13 +295,13 @@ class StackMachine {
       case instructions.SUB: {
         const a = this.pop();
         const b = this.pop();
-        tthis.push(a - b);
+        this.push(a - b);
         break;
       }
       case instructions.MUL: {
         const a = this.pop();
         const b = this.pop();
-        tthis.push(a * b);
+        this.push(a * b);
         break;
       }
       case instructions.LSF: {
@@ -270,6 +316,34 @@ class StackMachine {
         this.push(v >> s);
         break;
       }
+
+      case instructions.AND: {
+        const a = this.pop();
+        const b = this.pop();
+        this.push(a & b);
+        break;
+      }
+
+      case instructions.OR: {
+        const a = this.pop();
+        const b = this.pop();
+        this.push(a | b);
+        break;
+      }
+
+      case instructions.XOR: {
+        const a = this.pop();
+        const b = this.pop();
+        this.push(a ^ b);
+        break;
+      }
+
+      case instructions.NOT: {
+        const a = this.pop();
+        this.push(~a);
+        break;
+      }
+
       case instructions.INC: {
         this.writeU16(this.sp, this.readU16(this.sp) + 1);
         break;
@@ -306,7 +380,69 @@ class StackMachine {
         }
         break;
       }
+      case instructions.JEQ: {
+        const jmpAddress = this.pop();
+        const comparisonValue = this.pop();
+        const checkValue = this.readU16(this.sp);
+
+        if (checkValue === comparisonValue) {
+          this.ip = jmpAddress;
+        }
+        break;
+      }
+      case instructions.JNE: {
+        const jmpAddress = this.pop();
+        const comparisonValue = this.pop();
+        const checkValue = this.readU16(this.sp);
+
+        if (checkValue !== comparisonValue) {
+          this.ip = jmpAddress;
+        }
+        break;
+      }
+      case instructions.JGT: {
+        const jmpAddress = this.pop();
+        const comparisonValue = this.pop();
+        const checkValue = this.readU16(this.sp);
+
+        if (checkValue > comparisonValue) {
+          this.ip = jmpAddress;
+        }
+        break;
+      }
+      case instructions.JLT: {
+        const jmpAddress = this.pop();
+        const comparisonValue = this.pop();
+        const checkValue = this.readU16(this.sp);
+
+        if (checkValue < comparisonValue) {
+          this.ip = jmpAddress;
+        }
+        break;
+      }
+      case instructions.JGE: {
+        const jmpAddress = this.pop();
+        const comparisonValue = this.pop();
+        const checkValue = this.readU16(this.sp);
+
+        if (checkValue >= comparisonValue) {
+          this.ip = jmpAddress;
+        }
+        break;
+      }
+      case instructions.JLE: {
+        const jmpAddress = this.pop();
+        const comparisonValue = this.pop();
+        const checkValue = this.readU16(this.sp);
+
+        if (checkValue <= comparisonValue) {
+          this.ip = jmpAddress;
+        }
+        break;
+      }
       case instructions.HALT: {
+        // debugArrayBufferView(this.memoryView, 8*10, this.sp - 8 * 10)
+        this.debugStack();
         console.log(this.readU16(this.sp));
         return true;
       }
