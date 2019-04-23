@@ -1,19 +1,55 @@
-[x] Finish ret instruction
-[x] Implement reads and writes as method
-[x] Reimplement all pushes/pops using the actual push/pop methods
-[x] Create a full memory space, shared by the program and the stack
-[x] Implement addressing instructions
+# Notes for future
 
-- Validate and Assemble parsed output
-- Memory mapper
-  - When a read or a write happens, the memory mapper can intercept it, and choose to either perform the normal op
-    or to do something else
-- Binary that describes entry point
-- Real program loader: read header, set data, write program code, set size of stack, code region etc
-- Assembler that can define sections and created specialised binarys
+[!] As a principle, operations that act on values on the top of the stack should *consume* those values. That is, they should not be able to see a value they have not popped, as this leads to weird, non-intuitive bugs.
+Exceptions here are ones that copy parts of memory.
+
+
+- Rename MSM to CSM (copy stack to memory)
+
+- Assembler that can define sections and create specialised binarys
+- Memory bank support
 - C-like language that can be used to write code for the VirtualMachineConsole
 - 8 bit opcodes / unaligned data in binary
   - Example: 0xff01 0xffff -> PUSH 0xffff, HALT
+
+
+
+
+
+# Plan for graphics
+
+- Execute game code until it's time to draw a frame
+- Pause game code, saving the ip
+- Begin drawing background and then sprites, based on the objects in a particular region of memory
+- Begin drawing background and then foreground
+  - Both are combinations of tiles
+- The screen should be made up of 256x256 pixels, which is 32x32 tiles (8x8 pixels each)
+- A fixed, linear region of memory that strides of 32 bits (pointer to tile, pointer to palette entry)
+  - One for background :: 2048 bytes
+  - One for foreground :: 2048 bytes
+- Continuous video memory is 4096 bytes (4kb)
+
+Total memory: 64kb
+
+Video memory:  4kb
+Input memory:  ~5b
+
+
+0xffffff00
+
+- Objects are structures that describe
+  - The palette of the sprite
+  - It's position
+
+
+
+
+
+
+
+
+
+
 
 
 

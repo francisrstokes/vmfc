@@ -29,6 +29,10 @@ const debugArrayBufferView = (view, limit, start = 0) => {
   console.log(line)
 }
 
+const opcodeToInstruction = opcode => {
+  return Object.entries(instructions).find(([_, oc]) => opcode === oc)[0];
+}
+
 const MEMORY_SIZE = 0xFFFF;
 class StackMachine {
   constructor() {
@@ -39,6 +43,8 @@ class StackMachine {
     this.sp = 0xFFFD; // Stack Pointer
     this.fp = 0xFFFD; // Stack Frame Pointer
     this.fs = 0; // Stack Frame Size
+
+    this.entryPoint = 0;
   }
 
   debugArrayBufferView(view, limit, start = 0) {
@@ -65,9 +71,6 @@ class StackMachine {
 
     const headerInfo = getHeaderInformation(view);
 
-    console.log(`\nHexdump`)
-    debugArrayBufferView(view, program.byteLength);
-
     for (let i = 0; i < headerInfo.roLength; i += 2) {
       const address = i;
       const value = view.getUint16(address, true);
@@ -89,6 +92,7 @@ class StackMachine {
     }
 
     this.ip = headerInfo.roLength + headerInfo.dataLength;
+    this.entryPoint = this.ip;
 
     // Set up stack
     this.fp -= 2;
@@ -170,7 +174,8 @@ class StackMachine {
         break;
       }
       case instructions.PMS: {
-        this.push(this.readU16(this.pop()));
+        const address = this.pop();
+        this.push(this.readU16(address));
         break;
       }
       case instructions.PMF: {
@@ -180,7 +185,7 @@ class StackMachine {
         this.writeU16(this.fp + offset, value);
         break;
       }
-      case instructions.PIP: {
+        case instructions.PIP: {
         this.push(this.ip);
         break;
       }
@@ -240,8 +245,6 @@ class StackMachine {
         |---------------| (bottom of stack)
       */
       case instructions.CALL: {
-        console.log('Call Start');
-        this.debugStack();
         const returnAddress = this.ip;
         const jmpAddress = this.pop();
         const nArgs = this.pop();
@@ -257,8 +260,6 @@ class StackMachine {
 
         args.forEach(arg => this.push(arg));
         this.ip = jmpAddress;
-        console.log('Call End');
-        this.debugStack();
         break;
       }
 
@@ -270,8 +271,6 @@ class StackMachine {
       // . Set the frame size to fs
       // . Set ip to return address
       case instructions.RET: {
-        console.log('Return start');
-        this.debugStack();
         const returnValue = this.readU16(this.sp);
         const returnAddress = this.readU16(this.fp);
         const frameSize = this.readU16(this.fp + 2);
@@ -282,8 +281,6 @@ class StackMachine {
         this.ip = returnAddress;
 
         this.push(returnValue);
-        console.log('Return end');
-        this.debugStack();
         break;
       }
       case instructions.ADD: {
@@ -374,7 +371,7 @@ class StackMachine {
       }
       case instructions.JNZ: {
         const jmpAddress = this.pop();
-        const checkValue = this.readU16(this.sp);
+        const checkValue = this.pop();
         if (checkValue !== 0) {
           this.ip = jmpAddress;
         }
@@ -383,7 +380,7 @@ class StackMachine {
       case instructions.JEQ: {
         const jmpAddress = this.pop();
         const comparisonValue = this.pop();
-        const checkValue = this.readU16(this.sp);
+        const checkValue = this.pop();
 
         if (checkValue === comparisonValue) {
           this.ip = jmpAddress;
@@ -393,7 +390,7 @@ class StackMachine {
       case instructions.JNE: {
         const jmpAddress = this.pop();
         const comparisonValue = this.pop();
-        const checkValue = this.readU16(this.sp);
+        const checkValue = this.pop();
 
         if (checkValue !== comparisonValue) {
           this.ip = jmpAddress;
@@ -403,7 +400,7 @@ class StackMachine {
       case instructions.JGT: {
         const jmpAddress = this.pop();
         const comparisonValue = this.pop();
-        const checkValue = this.readU16(this.sp);
+        const checkValue = this.pop();
 
         if (checkValue > comparisonValue) {
           this.ip = jmpAddress;
@@ -413,7 +410,7 @@ class StackMachine {
       case instructions.JLT: {
         const jmpAddress = this.pop();
         const comparisonValue = this.pop();
-        const checkValue = this.readU16(this.sp);
+        const checkValue = this.pop();
 
         if (checkValue < comparisonValue) {
           this.ip = jmpAddress;
@@ -423,7 +420,7 @@ class StackMachine {
       case instructions.JGE: {
         const jmpAddress = this.pop();
         const comparisonValue = this.pop();
-        const checkValue = this.readU16(this.sp);
+        const checkValue = this.pop();
 
         if (checkValue >= comparisonValue) {
           this.ip = jmpAddress;
@@ -433,7 +430,7 @@ class StackMachine {
       case instructions.JLE: {
         const jmpAddress = this.pop();
         const comparisonValue = this.pop();
-        const checkValue = this.readU16(this.sp);
+        const checkValue = this.pop();
 
         if (checkValue <= comparisonValue) {
           this.ip = jmpAddress;
