@@ -101,9 +101,9 @@ class StackMachine {
       ? lastSection.offset + lastSection.length
       : 0;
 
-    for (let i = 0; i < headerInfo.codeLength; i += 2) {
-      const value = view.getUint16(headerInfo.codePtr + i, true);
-      this.memoryView.setUint16(baseCodeAddress + i, value);
+    for (let i = 0; i < headerInfo.codeLength; i += 1) {
+      const value = view.getUint8(headerInfo.codePtr + i, true);
+      this.memoryView.setUint8(baseCodeAddress + i, value);
     }
 
     this.ip = baseCodeAddress;
@@ -117,7 +117,7 @@ class StackMachine {
   }
 
   fetch16() {
-    const value = this.memoryView.getUint16(this.ip);
+    const value = this.memoryView.getUint16(this.ip, true);
     this.ip += 2;
     return value;
   }
@@ -172,7 +172,7 @@ class StackMachine {
   }
 
   step() {
-    const opcode = this.fetch16();
+    const opcode = this.fetch8();
 
     switch (opcode) {
       case instructions.NOP: {

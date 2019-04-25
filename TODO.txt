@@ -8,11 +8,6 @@ Exceptions here are ones that copy parts of memory.
 
 - Memory bank support
 - C-like language that can be used to write code for the VirtualMachineConsole
-- 8 bit opcodes / unaligned data in binary
-  - Example: 0xff01 0xffff -> PUSH 0xffff, HALT
-
-
-
 
 
 # Plan for graphics

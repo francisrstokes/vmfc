@@ -3,6 +3,7 @@ const instructions = require('../../src/instructions');
 const {
   Struct,
   RawString,
+  U8,
   U16,
   U8s,
   U16s,
@@ -37,7 +38,16 @@ const fillDataSection = (section, struct) => {
       struct.field(entry.name, U16s(bytes));
     } else if (entry.type === 'ascii') {
       const bytes = entry.data.split('').map(s => s.charCodeAt(0));
-      struct.field(entry.name, U16s(bytes));
+      if (bytes.length % 2 !== 0) bytes.push(0);
+      const data = [];
+
+      for (let i = 0; i < bytes.length; i += 2) {
+        const b1 = bytes[i];
+        const b2 = bytes[i+1];
+        data.push((b1 << 8) | b2);
+      }
+
+      struct.field(entry.name, U16s(data));
     } else if (entry.type === 'buffer') {
       const bytes = parseInt(entry.data, 16);
       struct.field(entry.name, U8s(bytes));
@@ -55,7 +65,7 @@ const fillCodeSection = (codeSection, struct, ast) => {
       struct.field(element.value, currentLabelStruct);
     } else {
       const opcode = instructions[element.kind.toUpperCase()];
-      const instructionStruct = Struct(element.kind).field('opcode', U16(opcode));
+      const instructionStruct = Struct(element.kind).field('opcode', U8(opcode));
 
       if (element.argument) {
         instructionStruct.field('argument', U16(0));
