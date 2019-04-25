@@ -9,7 +9,7 @@ if (process.argv.length < 3) {
   console.log(`Usage: assemble <asm file>`);
 }
 
-// const filepath = path.join(__dirname, '..', '.sketchpad/test-asm.sm');
+// const filepath = path.join(__dirname, '..', '.sketchpad/add-program.sm');
 const filepath = path.join(process.cwd(), process.argv[2]);
 const assemblyPath = filepath.replace(/\.a?sm$/, '') + '.bin';
 

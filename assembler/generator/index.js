@@ -115,7 +115,13 @@ const generator = ast => {
     .field('sections', sectionsStruct)
     .field('code', code);
 
-  const resolveLabelAddress = label => binBody.getDeepOffset(`code.${label}`);
+  const resolveLabelAddress = label => {
+    const lastSection = sections[sections.length-1];
+    const baseCodeAddress = lastSection
+      ? parseInt(lastSection.binaryAddress, 16) + sectionsStruct.get(lastSection.sectionName).computeBufferSize()
+      : 0;
+    return baseCodeAddress + code.getOffset(label);
+  };
   const resolveDataAddress = name => {
     for (const {offset, struct} of sectionsWithStructs) {
       if (struct.fields.find(([fName]) => fName === name)) {
