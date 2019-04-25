@@ -6,7 +6,6 @@ Exceptions here are ones that copy parts of memory.
 
 - Rename MSM to CSM (copy stack to memory)
 
-- Assembler that can define sections and create specialised binarys
 - Memory bank support
 - C-like language that can be used to write code for the VirtualMachineConsole
 - 8 bit opcodes / unaligned data in binary

@@ -1,23 +1,17 @@
 const validator = ast => {
   const {
-    rodata: { section: rodataSection },
-    data: { section: dataSection },
+    sections,
     code: { section: codeSection }
   } = ast;
 
-  const dataNames = [];
-  dataSection.forEach(element => {
-    if (dataNames.includes(element.name)) {
-      throw new Error(`Duplicate name '${element.aname}' found in data section`);
-    }
-    dataNames.push(element.name);
-  });
-
-  rodataSection.forEach(element => {
-    if (dataNames.includes(element.name)) {
-      throw new Error(`Duplicate name '${element.name}' found in rodata section`);
-    }
-    dataNames.push(element.name);
+  const dataNames = {};
+  sections.forEach(({sectionName, section}) => {
+    section.forEach(({name}) => {
+      if (Object.keys(dataNames).includes(name)) {
+        throw new Error(`Duplicate data item '${name}' found in sections '${sectionName}' and '${dataNames[name]}'`);
+      }
+      dataNames[name] = sectionName
+    });
   });
 
   const labelNames = [];
@@ -42,7 +36,27 @@ const validator = ast => {
         }
       }
     }
-  })
+  });
+
+
+  // Assert that no sections overlap
+  const sSizes = sections.reduce((acc, {sectionName, section}) => {
+    acc[sectionName] = section.reduce((acc, cur) => {
+      if(cur.type === 'bytes' || cur.type === 'ascii') return acc + cur.data.length;
+      if(cur.type === 'words') return acc + cur.data.length * 2;
+      if(cur.type === 'buffer') return acc + parseInt(cur.data, 16);
+    }, 0);
+    return acc;
+  }, {});
+
+  sections.forEach(({binaryAddress, sectionName}, i) => {
+    if (i + 1 >= sections.length-1) return;
+    const next = sections[i+1];
+
+    if (sSizes[sectionName] + parseInt(binaryAddress, 16) >= parseInt(next.binaryAddress, 16)) {
+      throw new Error(`Section ${sectionName} overlaps with section ${next.sectionName}`);
+    }
+  });
 
   return true;
 }

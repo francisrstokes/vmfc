@@ -18,7 +18,7 @@ const machine = new MMStackMachine();
 
 const binaryPath = process.argv.length < 3
   // ? path.join(process.cwd(), './.sketchpad/basic.bin')
-  ? path.join(process.cwd(), './.sketchpad/add-program.bin')
+  ? path.join(process.cwd(), './.sketchpad/test-asm.bin')
   : path.join(process.cwd(), process.argv[2]);
 
 console.log(`Loading binary ${binaryPath}`);

@@ -9,7 +9,8 @@ const {
   namedSequenceOf,
   everythingUntil,
   sequenceOf,
-  whitespace
+  whitespace,
+  between
 } = require('arcsecond');
 const Do = require('lazy-do');
 
@@ -39,7 +40,7 @@ const sequencedNamed = parsers => namedSequenceOf(
   return v;
 });
 
-
+const whitespaceSurrounded = between(possibly(Whitespace))(possibly(Whitespace));
 
 module.exports = {
   newline,
@@ -51,5 +52,6 @@ module.exports = {
   commentNoNewline,
   possibleComments,
   sequencedNamed,
-  spaces: Whitespace
+  spaces: Whitespace,
+  whitespaceSurrounded
 };

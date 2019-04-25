@@ -5,14 +5,34 @@ const validateMagicNumber = view => {
   return view.getUint32(0) === 0x564d4643;
 }
 
-const getHeaderInformation = view => ({
-  roPtr: view.getUint16(4),
-  roLength: view.getUint16(6),
-  dataPtr: view.getUint16(8),
-  dataLength: view.getUint16(10),
-  codePtr: view.getUint16(12),
-  codeLength: view.getUint16(14),
-});
+const getHeaderInformation = view => {
+  const sections = [];
+  let offset = 4;
+  while (true) {
+    // Check for "ENDS"
+    if (view.getUint32(offset) === 0x454e4453) {
+      offset += 4;
+      break;
+    }
+
+    sections.push({
+      ptr: view.getUint16(offset, true),
+      offset: view.getUint16(offset + 2, true),
+      length: view.getUint16(offset + 4, true),
+    })
+
+    offset += 6;
+  }
+
+  const codePtr = view.getUint16(offset, true);
+  const codeLength = view.getUint16(offset + 2, true);
+
+  return {
+    codePtr,
+    codeLength,
+    sections
+  };
+}
 
 const debugArrayBufferView = (view, limit, start = 0) => {
   const padZero = (n, zeros = 2) => ("0".repeat(zeros) + n.toString(16)).slice(-zeros);
@@ -27,10 +47,6 @@ const debugArrayBufferView = (view, limit, start = 0) => {
     offset++;
   }
   console.log(line)
-}
-
-const opcodeToInstruction = opcode => {
-  return Object.entries(instructions).find(([_, oc]) => opcode === oc)[0];
 }
 
 const MEMORY_SIZE = 0xFFFF;
@@ -71,34 +87,32 @@ class StackMachine {
 
     const headerInfo = getHeaderInformation(view);
 
-    for (let i = 0; i < headerInfo.roLength; i += 2) {
-      const address = i;
-      const value = view.getUint16(address, true);
-      this.memoryView.setUint16(address - headerInfo.roPtr, value);
-    }
+    headerInfo.sections.forEach(section => {
+      if (section.length === 0) return;
+      const baseMemoryAddress = section.offset;
+      for (let i = 0; i < section.length; i += 2) {
+        const value = view.getUint16(section.ptr + i, true);
+        this.memoryView.setUint16(baseMemoryAddress + i, value);
+      }
+    });
 
-    for (let i = 0; i < headerInfo.dataLength; i += 2) {
-      const address = headerInfo.dataPtr + i;
-      const value = view.getUint16(address, true);
-      const offset = address - headerInfo.roPtr;
-      this.memoryView.setUint16(offset, value);
-    }
+    const lastSection = headerInfo.sections[headerInfo.sections.length-1];
+    const baseCodeAddress = lastSection
+      ? lastSection.offset + lastSection.length
+      : 0;
 
     for (let i = 0; i < headerInfo.codeLength; i += 2) {
-      const address = headerInfo.codePtr + i;
-      const value = view.getUint16(address, true);
-      const offset = address - headerInfo.dataPtr;
-      this.memoryView.setUint16(offset, value);
+      const value = view.getUint16(headerInfo.codePtr + i, true);
+      this.memoryView.setUint16(baseCodeAddress + i, value);
     }
 
-    this.ip = headerInfo.roLength + headerInfo.dataLength;
+    this.ip = baseCodeAddress;
     this.entryPoint = this.ip;
 
     // Set up stack
     this.fp -= 2;
     this.sp -= 2;
 
-    console.log('Machine start');
     this.debugStack();
   }
 

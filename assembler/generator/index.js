@@ -4,6 +4,7 @@ const {
   Struct,
   RawString,
   U16,
+  U8s,
   U16s,
 } = require('construct-js');
 
@@ -11,16 +12,17 @@ const {
 --- Bin Structure ---
 HEADER:
   Magic header
-  ROData Ptr
-  ROData Length
-  Data Ptr
-  Data Length
+  [Section Descriptors]
+  Section End Marker
   Code Ptr
   Code Length
-RODATA:
-  Raw Data
-DATA:
-  Raw Data
+SECTION_1:
+  Data
+SECTION_2:
+  Data
+...
+SECTION_N:
+  Data
 CODE:
   Raw Code
 */
@@ -29,10 +31,16 @@ const fillDataSection = (section, struct) => {
   section.forEach(entry => {
     if (entry.type === 'bytes') {
       const bytes = entry.data.map(s => parseInt(s, 16));
+      struct.field(entry.name, U8s(bytes));
+    } else if (entry.type === 'words') {
+      const bytes = entry.data.map(s => parseInt(s, 16));
       struct.field(entry.name, U16s(bytes));
     } else if (entry.type === 'ascii') {
       const bytes = entry.data.split('').map(s => s.charCodeAt(0));
       struct.field(entry.name, U16s(bytes));
+    } else if (entry.type === 'buffer') {
+      const bytes = parseInt(entry.data, 16);
+      struct.field(entry.name, U8s(bytes));
     }
   });
 };
@@ -65,45 +73,57 @@ const fillCodeSection = (codeSection, struct, ast) => {
 
 const generator = ast => {
   const {
-    rodata: { section: rodataSection },
-    data: { section: dataSection },
+    sections,
     code: { section: codeSection },
   } = ast;
 
-  const header = Struct('VMFCHeader', false)
-    .field('magic', RawString('VMFC'))
-    .field('rodataPtr', U16(0))
-    .field('rodataLength', U16(0))
-    .field('dataPtr', U16(0))
-    .field('dataLength', U16(0))
-    .field('codePtr', U16(0))
-    .field('codeLength', U16(0));
-
-  const data = Struct('VMFCData');
-  fillDataSection(dataSection, data);
-
-  const rodata = Struct('VMFCROData');
-  fillDataSection(rodataSection, rodata);
-
-  header.get('rodataLength').set(rodata.computeBufferSize())
-  header.get('dataLength').set(data.computeBufferSize())
+  const sectionsWithStructs = sections.map(({sectionName, binaryAddress, section}) => {
+    const struct = Struct(sectionName);
+    fillDataSection(section, struct);
+    return {
+      struct,
+      offset: binaryAddress
+    };
+  }).sort((a, b) => a.offset > b.offset);
 
   const code = Struct('VMFCCode');
   fillCodeSection(codeSection, code);
 
+  const header = Struct('VMFCHeader')
+    .field('magic', RawString('VMFC'));
+
+  sectionsWithStructs.forEach(({offset, struct}) => {
+    const sectionDescriptor = Struct(struct.name)
+      .field('pointer', U16(0))
+      .field('offset', U16(parseInt(offset, 16)))
+      .field('length', U16(struct.computeBufferSize()));
+
+    header.field(`descriptor_${struct.name}`, sectionDescriptor);
+  });
+
+  header.field('sectionEndMarker', RawString('ENDS'))
+  header.field('codePtr', U16(0));
+  header.field('codeLength', U16(code.computeBufferSize()));
+
+  const sectionsStruct = Struct('AllSections');
+  sectionsWithStructs.forEach(({struct}) => {
+    sectionsStruct.field(struct.name, struct);
+  });
+
   const binBody = Struct('BinaryBody')
-    .field('rodata', rodata)
-    .field('data', data)
+    .field('header', header)
+    .field('sections', sectionsStruct)
     .field('code', code);
 
   const resolveLabelAddress = label => binBody.getDeepOffset(`code.${label}`);
   const resolveDataAddress = name => {
-    const segment = data.find(item => item.name === name)
-      ? 'data'
-      : 'rodata';
-    return binBody.getDeepOffset(`${segment}.${name}`);
-  };
-
+    for (const {offset, struct} of sectionsWithStructs) {
+      if (struct.fields.find(([fName]) => fName === name)) {
+        return parseInt(offset, 16) + struct.getOffset(name);
+      }
+    }
+    throw new Error(`Cannot find ${name} in section data`);
+  }
   const resolveArgument = argument => {
     switch (argument.type) {
       case 'literal-value': return parseInt(argument.value, 16);
@@ -127,16 +147,14 @@ const generator = ast => {
     }
   });
 
-  const finalExecutable = Struct('VMFCExecutable')
-    .field('header', header)
-    .field('body', binBody);
+  sections.forEach(({sectionName}) => {
+    const headerPath = `descriptor_${sectionName}.pointer`;
+    const sectionPath = `sections.${sectionName}`;
+    header.getDeep(headerPath).set(binBody.getDeepOffset(sectionPath));
+  });
+  header.get('codePtr').set(binBody.getOffset('code'));
 
-  header.get('rodataPtr').set(finalExecutable.getDeepOffset('body.rodata'));
-  header.get('dataPtr').set(finalExecutable.getDeepOffset('body.data'));
-  header.get('codePtr').set(finalExecutable.getDeepOffset('body.code'));
-  header.get('codeLength').set(finalExecutable.getDeep('body.code').computeBufferSize());
-
-  return finalExecutable.toBuffer();
+  return binBody.toBuffer();
 }
 
 

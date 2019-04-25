@@ -14,11 +14,13 @@ const {
   Parser
 } = require('arcsecond');
 const {
+  sequencedNamed,
   newline,
   Whitespace,
   hex16,
   doParser,
-  comment
+  comment,
+  whitespaceSurrounded
 } = require('./common');
 
 const dataLineSpecific = doParser(function* () {
@@ -28,11 +30,19 @@ const dataLineSpecific = doParser(function* () {
   let data;
   switch (type) {
     case 'bytes': {
-      data = yield sepBy (char(',')) (hex16);
+      data = yield sepBy (whitespaceSurrounded(char(','))) (hex16);
+      break;
+    }
+    case 'words': {
+      data = yield sepBy (whitespaceSurrounded(char(','))) (hex16);
       break;
     }
     case 'ascii': {
       data = yield everythingUntil(newline);
+      break;
+    }
+    case 'buffer': {
+      data = yield hex16;
       break;
     }
   }
@@ -47,35 +57,25 @@ const dataLine = namedSequenceOf([
   ['_', newline]
 ]).map(({name, data: {type, data}}) => ({name, type, data}))
 
-const dataParser = sequenceOf([
+const sectionParser = sequencedNamed([
   whitespace,
   many(choice([ comment, newline ])),
-  str('.data'),
+  str('.section'),
+  Whitespace,
+  ['sectionName', letters],
+  Whitespace,
+  ['binaryAddress', hex16],
   sequenceOf([ possibly(Whitespace), many1(newline) ]),
-  many(choice([
+  ['dataLines', many(choice([
     dataLine,
     comment
-  ])).map(matches => matches.filter(match => match.type !== 'comment'))
-]).map(parsed => ({
-  type: 'data-section',
-  section: parsed[4]
+  ])).map(matches => matches.filter(match => match.type !== 'comment'))]
+]).map(({sectionName, binaryAddress, dataLines}) => ({
+  type: 'section',
+  sectionName,
+  binaryAddress,
+  section: dataLines
 }));
 
-const roDataParser = sequenceOf([
-  whitespace,
-  many(choice([ comment, newline ])),
-  str('.rodata'),
-  sequenceOf([ possibly(Whitespace), many1(newline) ]),
-  many(choice([
-    dataLine,
-    comment
-  ])).map(matches => matches.filter(match => match.type !== 'comment'))
-]).map(parsed => ({
-  type: 'rodata-section',
-  section: parsed[4]
-}));
+module.exports = sectionParser;
 
-module.exports = {
-  dataParser,
-  roDataParser
-};
