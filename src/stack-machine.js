@@ -117,7 +117,7 @@ class StackMachine {
   }
 
   fetch16() {
-    const value = this.memoryView.getUint16(this.ip, true);
+    const value = this.memoryView.getUint16(this.ip);
     this.ip += 2;
     return value;
   }

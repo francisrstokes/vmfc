@@ -9,23 +9,47 @@ const {
   U16s,
 } = require('construct-js');
 
+const randomId = () => Math.random().toString(16).slice(2);
+
 /*
---- Bin Structure ---
-HEADER:
-  Magic header
-  [Section Descriptors]
+/////////// Binary Structure //////////
+
+=================
+      Header
+=================
+
+  Raw String: VMFC
+  [
+    -------------------
+    Section Descriptors
+    -------------------
+    Pointer to start in binary
+    Offset in RAM
+    Length
+  ]
   Section End Marker
-  Code Ptr
+  Code Pointer
   Code Length
-SECTION_1:
+
+=================
+    Sections
+=================
+
   Data
-SECTION_2:
-  Data
-...
-SECTION_N:
-  Data
-CODE:
-  Raw Code
+
+=================
+ End of Sections
+=================
+
+  Raw String: ENDS
+
+=================
+      Code
+=================
+
+  Instructions
+
+///////////////////////////////////////
 */
 
 const fillDataSection = (section, struct) => {
@@ -38,6 +62,10 @@ const fillDataSection = (section, struct) => {
       struct.field(entry.name, U16s(bytes));
     } else if (entry.type === 'ascii') {
       const bytes = entry.data.split('').map(s => s.charCodeAt(0));
+
+      // For consistent byte ordering, we pack the bytes together into a single 16 bit
+      // number. This has the implication that a string of uneven length will naturally
+      // be padded with 0x00 at the end
       if (bytes.length % 2 !== 0) bytes.push(0);
       const data = [];
 
@@ -55,10 +83,13 @@ const fillDataSection = (section, struct) => {
   });
 };
 
-const fillCodeSection = (codeSection, struct, ast) => {
-  let currentLabelStruct = Struct('__GLOBAL_VM_ENTRY');
-  struct.field('__GLOBAL_VM_ENTRY', currentLabelStruct);
+const fillCodeSection = (codeSection, struct) => {
+  const entryPointLabel = randomId();
+  let currentLabelStruct = Struct(entryPointLabel);
+  struct.field(entryPointLabel, currentLabelStruct);
 
+  // Create a struct for every label in the program, which groups the instructions
+  // until the next label
   codeSection.forEach(element => {
     if (element.type === 'label') {
       currentLabelStruct = Struct(element.value);
@@ -68,15 +99,14 @@ const fillCodeSection = (codeSection, struct, ast) => {
       const instructionStruct = Struct(element.kind).field('opcode', U8(opcode));
 
       if (element.argument) {
-        instructionStruct.field('argument', U16(0));
+        // If there is an argument it will be resolved later, but all arguments are 16 bits
+        // For consistency of encoding this is represented as 2 8-bit numbers
+        instructionStruct.field('argument', U8s([0, 0]));
       }
 
+      // Create a reference to the struct on the AST element so we can resolve the argument later
       element.struct = instructionStruct;
-
-      currentLabelStruct.field(
-        `${element.kind}_${Math.random().toString(16).slice(2)}`,
-        instructionStruct
-      );
+      currentLabelStruct.field(`${element.kind}_${randomId()}`, instructionStruct);
     }
   });
 }
@@ -87,6 +117,8 @@ const generator = ast => {
     code: { section: codeSection },
   } = ast;
 
+
+  // Build an array of struct/offsets for the sections
   const sectionsWithStructs = sections.map(({sectionName, binaryAddress, section}) => {
     const struct = Struct(sectionName);
     fillDataSection(section, struct);
@@ -96,12 +128,16 @@ const generator = ast => {
     };
   }).sort((a, b) => a.offset > b.offset);
 
+  // Create the code section
   const code = Struct('VMFCCode');
+  // When the code struct is populated the code section of the AST is annotated
+  // with references to the struct so variables can later be resolved
   fillCodeSection(codeSection, code);
 
-  const header = Struct('VMFCHeader')
-    .field('magic', RawString('VMFC'));
+  // Create a header struct
+  const header = Struct('VMFCHeader').field('magic', RawString('VMFC'));
 
+  // Add section information to the header
   sectionsWithStructs.forEach(({offset, struct}) => {
     const sectionDescriptor = Struct(struct.name)
       .field('pointer', U16(0))
@@ -111,20 +147,23 @@ const generator = ast => {
     header.field(`descriptor_${struct.name}`, sectionDescriptor);
   });
 
+  // Finalise the header (pointers of sections and code will be filled in later)
   header.field('sectionEndMarker', RawString('ENDS'))
   header.field('codePtr', U16(0));
   header.field('codeLength', U16(code.computeBufferSize()));
 
+  // Create a struct to hold all the section data
   const sectionsStruct = Struct('AllSections');
-  sectionsWithStructs.forEach(({struct}) => {
-    sectionsStruct.field(struct.name, struct);
-  });
+  sectionsWithStructs.forEach(({struct}) => sectionsStruct.field(struct.name, struct));
 
+  // Create a struct container the entire binary
   const binBody = Struct('BinaryBody')
     .field('header', header)
     .field('sections', sectionsStruct)
     .field('code', code);
 
+  // Functions to resolve label and data arguments, declared inline because they
+  // convieniently close over the local structures
   const resolveLabelAddress = label => {
     const lastSection = sections[sections.length-1];
     const baseCodeAddress = lastSection
@@ -157,19 +196,29 @@ const generator = ast => {
     }
   }
 
+  // With the binary structure finalised the AST can be traversed and arguments resolved
   ast.code.section.forEach(element => {
     if (element.type === 'instruction' && element.argument) {
-      element.struct.get('argument').set(resolveArgument(element.argument));
+      const arg = resolveArgument(element.argument);
+
+      // Byte swap the high and low parts so they are properly and consistently encoded in the binary
+      const low = arg & 0x00FF;
+      const high = (arg & 0xFF00) >> 8;
+      element.struct.get('argument').set([high, low]);
     }
   });
 
+  // Set the header section pointers
   sections.forEach(({sectionName}) => {
     const headerPath = `descriptor_${sectionName}.pointer`;
     const sectionPath = `sections.${sectionName}`;
     header.getDeep(headerPath).set(binBody.getDeepOffset(sectionPath));
   });
+
+  // Set the code pointer
   header.get('codePtr').set(binBody.getOffset('code'));
 
+  // Return the assembled buffer
   return binBody.toBuffer();
 }
 
