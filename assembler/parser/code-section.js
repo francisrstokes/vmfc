@@ -3,13 +3,11 @@ const {
   char,
   choice,
   sequenceOf,
-  namedSequenceOf,
   whitespace,
   regex,
   possibly,
   many,
   letters,
-  tapParser,
   Parser,
   takeLeft,
 } = require('arcsecond');
@@ -28,12 +26,17 @@ const {
 
 const validLabel = regex(/^[a-zA-Z0-9\-_]+/)
 
-const label = sequenceOf([
+const label = sequencedNamed([
   whitespace,
   char(':'),
-  validLabel,
-  possibly(Whitespace)
-]).map(([_, __, name]) => ({ type: 'label', value: name }));
+  ['name', validLabel],
+  possibly(Whitespace),
+  ['comment', possibly(commentNoNewline)],
+]).map(({comment, name}) => ({
+  type: 'label',
+  value: name,
+  endOfLineComment: comment
+}));
 
 const basicArgument = takeLeft(choice([
   sequenceOf([
@@ -70,32 +73,38 @@ const arithmeticArgument = takeLeft(
 const argument = choice([ arithmeticArgument, basicArgument ]);
 
 const singleInstruction = instruction =>
-  sequenceOf([
+  sequencedNamed([
     possibly(Whitespace),
     choice([
       str(instruction),
       str(instruction.toUpperCase()),
     ]),
     possibly(Whitespace),
-  ]).map(_ => ({
+    ['comment', possibly(commentNoNewline)],
+  ]).map(({comment}) => ({
     type: 'instruction',
     kind: instruction,
-    argument: null
+    argument: null,
+    endOfLineComment: comment
   }));
 
+
 const argumentInstruction = instruction =>
-  sequenceOf([
+  sequencedNamed([
     possibly(Whitespace),
     choice([
       str(instruction),
       str(instruction.toUpperCase()),
     ]),
     Whitespace,
-    argument
-  ]).map(([_, __, ___, argument]) => ({
+    ['argument', argument],
+    possibly(Whitespace),
+    ['comment', possibly(commentNoNewline)],
+  ]).map(({comment, argument}) => ({
     type: 'instruction',
     kind: instruction,
-    argument
+    argument,
+    endOfLineComment: comment
   }));
 
 const codeSectionItem = takeLeft(choice([
@@ -148,11 +157,9 @@ module.exports = doParser(function* () {
 
   yield str('.code');
   yield possibly(Whitespace);
-  yield many(choice([ newline, comment ]));
+  yield many(choice([ newline, comment ]))
 
-  const entries = (yield many(codeSectionItem)).filter(entry => {
-    return entry.type !== 'comment'
-  });
+  const entries = (yield many(codeSectionItem));
 
   return Parser.of({
     type: 'code-section',

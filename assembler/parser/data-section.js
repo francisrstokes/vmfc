@@ -69,7 +69,7 @@ const sectionParser = sequencedNamed([
   ['dataLines', many(choice([
     dataLine,
     comment
-  ])).map(matches => matches.filter(match => match.type !== 'comment'))]
+  ]))]
 ]).map(({sectionName, binaryAddress, dataLines}) => ({
   type: 'section',
   sectionName,

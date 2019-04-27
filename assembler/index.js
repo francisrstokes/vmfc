@@ -2,8 +2,8 @@ const fs = require('fs');
 const path = require('path');
 const parser = require('./parser');
 const validator = require('./validator');
+const transformer = require('./transformer');
 const generator = require('./generator');
-
 
 if (process.argv.length < 3) {
   console.log(`Usage: assemble <asm file>`);
@@ -19,7 +19,7 @@ fs.readFile(filepath, 'utf8', (err, file) => {
     process.exit(1);
   }
 
-  const ast = parser(file);
+  const ast = transformer(parser(file));
   validator(ast);
   const binary = generator(ast);
 

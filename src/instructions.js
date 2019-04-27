@@ -1,42 +1,54 @@
-const PUSH  = 0x01; // Push a value to the stack
-const PIP   = 0x02; // Push the instruction pointer to the stack
-const PSP   = 0x03; // Push the stack pointer to the stack
-const ADD   = 0x04; // Add the last two value of the stack, sp and (sp - 1), and write the result to (sp - 1)
-const INC   = 0x05; // Add one to the value at sp
-const DEC   = 0x06; // Subtract one from the value at sp
-const MUL   = 0x07; // Multiply the last two value of the stack, sp and (sp - 1), and write the result to (sp - 1)
-const SUB   = 0x08; // Subtract the last two value of the stack, sp and (sp - 1), and write the result to (sp - 1)
-const LSF   = 0x09; // Pop a shift amount S, and the value V, and write the result of V << S
-const RSF   = 0x0A; // Pop a shift amount S, and the value V, and write the result of V >> S
-const CALL  = 0x0B; // Call a function, pushing the current ip to the stack
-const RET   = 0x0C; // Return from a function by swapping the value at sp and (sp - 1) and jumping to the address that was in (sp - 1)
-const ISP   = 0x0D; // Increment stack pointer
-const DSP   = 0x0E; // Decrement stack pointer
-const IIP   = 0x0F; // Increment instruction pointer
-const DIP   = 0x10; // Decrement instruction pointer
-const JNZ   = 0x11; // Jump if not zero
-const JMP   = 0x12; // Set the instruction pointer
-const SSP   = 0x13; // Set the stack pointer
-const PMS   = 0x14; // Push memory to stack
-const PMF   = 0x15; // Push memory to fp + offset
-const MSM   = 0x16; // Move stack to memory
-const CPS   = 0x17; // Push value from (fp - offset) to top of stack
-const SMV   = 0x18; // Move value at top of stack to (fp - offset)
-const JEQ   = 0x19; // Jump if equal
-const JNE   = 0x1A; // Jump if not equal
-const JGT   = 0x1B; // Jump if greater than equal
-const JLT   = 0x1C; // Jump if less than equal
-const JGE   = 0x1D; // Jump if greater than or equal
-const JLE   = 0x1E; // Jump if less than or equal
-const AND   = 0x1F; // Logical and
-const OR    = 0x20; // Logical or
-const XOR   = 0x21; // Logical xor
-const NOT   = 0x22; // Logical not
+let nextOpcode = 1;
 
+// push instructions
+const PUSH  = nextOpcode++; // Push a value to the stack
+const PIP   = nextOpcode++; // Push the instruction pointer to the stack
+const PSP   = nextOpcode++; // Push the stack pointer to the stack
+const PMS   = nextOpcode++; // Push memory to stack
+const PMF   = nextOpcode++; // Push memory to fp + offset
+const CPS   = nextOpcode++; // Push value from (fp - offset) to top of stack
 
-const HALT  = 0xFF; // Halt the program and write the result to the screen
-const DBG   = 0xFE; // Debug will force a breakpoint in debug mode
-const NOP   = 0xFD; // Noop
+// Arithmetic
+const ADD   = nextOpcode++; // Add the last two value of the stack, sp and (sp - 1), and write the result to (sp - 1)
+const INC   = nextOpcode++; // Add one to the value at sp
+const DEC   = nextOpcode++; // Subtract one from the value at sp
+const MUL   = nextOpcode++; // Multiply the last two value of the stack, sp and (sp - 1), and write the result to (sp - 1)
+const SUB   = nextOpcode++; // Subtract the last two value of the stack, sp and (sp - 1), and write the result to (sp - 1)
+const LSF   = nextOpcode++; // Pop a shift amount S, and the value V, and write the result of V << S
+const RSF   = nextOpcode++; // Pop a shift amount S, and the value V, and write the result of V >> S
+const AND   = nextOpcode++; // Logical and
+const OR    = nextOpcode++; // Logical or
+const XOR   = nextOpcode++; // Logical xor
+const NOT   = nextOpcode++; // Logical not
+
+// Calling/returning
+const CALL  = nextOpcode++; // Call a function, pushing the current ip to the stack
+const RET   = nextOpcode++; // Return from a function by swapping the value at sp and (sp - 1) and jumping to the address that was in (sp - 1)
+
+// Modifying internal state
+const ISP   = nextOpcode++; // Increment stack pointer
+const DSP   = nextOpcode++; // Decrement stack pointer
+const IIP   = nextOpcode++; // Increment instruction pointer
+const DIP   = nextOpcode++; // Decrement instruction pointer
+const SSP   = nextOpcode++; // Set the stack pointer
+const HALT  = nextOpcode++; // Halt the program and write the result to the screen
+const DBG   = nextOpcode++; // Debug will force a breakpoint in debug mode
+const NOP   = nextOpcode++; // Noop
+
+// Branching
+const JNZ   = nextOpcode++; // Jump if not zero
+const JMP   = nextOpcode++; // Set the instruction pointer
+const JEQ   = nextOpcode++; // Jump if equal
+const JNE   = nextOpcode++; // Jump if not equal
+const JGT   = nextOpcode++; // Jump if greater than equal
+const JLT   = nextOpcode++; // Jump if less than equal
+const JGE   = nextOpcode++; // Jump if greater than or equal
+const JLE   = nextOpcode++; // Jump if less than or equal
+
+// Storing
+const MSM   = nextOpcode++; // Move stack to memory
+const SMV   = nextOpcode++; // Move value at top of stack to (fp - offset)
+
 
 module.exports = {
   PUSH,
