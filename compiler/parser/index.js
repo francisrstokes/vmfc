@@ -7,64 +7,90 @@ const {
   digits,
   char,
   fail,
-  Parser
+  possibly,
+  Parser,
+  recursiveParser,
+  takeLeft,
+  takeRight,
+  many,
+  sepBy,
+  between
 } = require('arcsecond');
-const {doParser, spaces} = require('../../assembler/parser/common');
+const {
+  doParser,
+  spaces,
+  sequencedNamed
+} = require('../../assembler/parser/common');
 
+const translateToAssembly = require('../index');
 
-const ASSIGNMENT_STATEMENT = 'assignment_statement';
-const REASSIGNMENT_STATEMENT = 'reassignment_statement';
+const {
+  ASSIGNMENT_STATEMENT,
+  REASSIGNMENT_STATEMENT,
+  BRACKET_EXPR,
+  ADDITION_EXPR,
+  SUBTRACTION_EXPR,
+  MULTIPLICATION_EXPR,
+  FUNCTION,
+  IDENTIFIER,
+  LITERAL_INT,
+  STACK_VARIABLE,
+} = require('../constants');
 
-const TYPE_IDENTIFIER = 'type_identifier';
-const IDENTIFIER = 'identifier';
-const LITERAL_INT = 'literal_int';
+const spaceSurrounded = between (possibly(spaces)) (possibly(spaces));
+const bracketed = between (spaceSurrounded(char('('))) (spaceSurrounded(char(')')));
+const strictBracketed = between (char('(')) (char(')'));
 
-const createTypeIdentifier = typeName => _ => ({ type: TYPE_IDENTIFIER, value: typeName });
 const createIdentifier = identifier => ({ type: IDENTIFIER, value: identifier });
 const createInt = value => ({ type: LITERAL_INT, value });
-
-// type       = choice [int]
-// identifier = regex /^[a-zA-Z_][a-zA-Z0-9_]+/
-// intValue   = choice [digits, hex]
-// assignment = [type, identifier, valueBasedOnType]
-
-const typeP = choice([
-  str('int').map(createTypeIdentifier('int'))
-]);
+const createBinaryExpression = (type, a, b) => ({ type, value: { a, b } });
+const createStackVariable = value => ({ type: STACK_VARIABLE, value });
+const createFunction = (name, args, value) => ({ type: FUNCTION, name, value });
 
 const identifierP = regex(/^[a-zA-Z_][a-zA-Z0-9_]*/).map(createIdentifier);
 
 const intP = choice([
+  regex(/^0x[0-9A-Fa-f]{1,4}/).map(v => parseInt(v, 16)),
   digits.map(v => parseInt(v, 10)),
-  regex(/^0x[0-9A-Fa-f]{1, 4}/).map(v => parseInt(v, 16))
 ]).map(createInt);
 
-const valueP = choice([ intP ]);
+const stackVariableP = takeRight(char('$'))(identifierP).map(createStackVariable);
+
+const binaryExprP = (operator, type) => recursiveParser(() =>
+  strictBracketed(sequencedNamed([
+    ['a', exprP],
+    spaces,
+    str(operator),
+    spaces,
+    ['b', exprP]
+  ])).map(({a, b}) => createBinaryExpression(type, a, b))
+);
+
+const exprP = recursiveParser(() => choice([
+  binaryExprP('+', ADDITION_EXPR),
+  binaryExprP('-', SUBTRACTION_EXPR),
+  binaryExprP('*', MULTIPLICATION_EXPR),
+
+  intP,
+  stackVariableP,
+
+  bracketed(exprP)
+]));
 
 const assignmentP = doParser(function* () {
-  const type = yield typeP;
-  yield spaces;
+  yield regex(/^var[ ]+/);
   const identifier = yield identifierP;
-  yield spaces;
-  yield char('=');
-  yield spaces;
+  yield regex(/^[ ]+=[ ]+/);
 
-  let value;
-  if (type.value === 'int') {
-    value = yield intP;
-  } else {
-    return yield fail(`Unsupported type ${type.value}`);
-  }
+  const value = yield exprP;
+  yield possibly(spaces);
 
   yield char(';');
 
   return Parser.of({
     type: ASSIGNMENT_STATEMENT,
-    value: {
-      type,
-      identifier,
-      value
-    }
+    identifier,
+    value
   });
 });
 
@@ -74,28 +100,62 @@ const reassignmentP = doParser(function* () {
   yield char('=');
   yield spaces;
 
-  const value = yield valueP.leftMap(() => `Unknown value type`);
+  const value = yield exprP;
+  yield spaces;
+
   yield char(';');
 
   return Parser.of({
     type: REASSIGNMENT_STATEMENT,
-    value: {
-      type,
-      identifier,
-      value
-    }
+    identifier,
+    value
   });
 });
 
+const functionP = doParser(function* () {
+  yield regex(/^fn[ ]+/);
+  const identifier = yield identifierP;
+  yield regex(/^[ ]*[ \n\t]+/);
+
+  const args = yield strictBracketed(
+    sepBy(char(','))(spaceSurrounded(identifierP))
+  );
+
+  yield regex(/^[ ]*\{[ \n\t]+/);
+
+  const statements = yield many(
+    takeLeft (assignmentP) (regex(/^[ \n\t]+/))
+  );
+
+  const returnStatement = yield takeRight (regex(/^return[ ]+/)) (
+    takeLeft(exprP)(regex(/^[ ]*;[ \t\n]+}/))
+  );
+
+  return Parser.of({
+    type: FUNCTION,
+    name: identifier,
+    args,
+    value: [
+      ...statements,
+      returnStatement
+    ]
+  });
+})
 
 
-fs.readFile(path.join(__dirname, '../test.vmc'), 'utf8', (err, data) => {
-  if (err) {
-    debugger;
-  }
+const src = [
+  'fn someFnName (a, b) {',
+  '  var x = ($a + 0x5);',
+  '  return (($x * $b) + $a);',
+  '}',
+].join('\n');
 
-  console.log(
-    reassignmentP.run('a = 42;')
-  )
-  debugger;
-});
+console.log(src);
+
+console.log(
+  functionP
+    .run(src)
+    .map(x => translateToAssembly(x, {}, ''))
+)
+
+debugger;

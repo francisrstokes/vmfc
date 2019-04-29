@@ -1,3 +1,7 @@
 var a = 0x04;
 var b = 0xABCD;
 var c = a + b;
+
+fn someFnName(a, b, c) {
+  
+}
