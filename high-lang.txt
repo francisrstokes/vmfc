@@ -1,0 +1,50 @@
+# Higher level language for assembler
+
+- Basically a small macro language
+- Expose some handy things:
+  - Function declaration and calling facilities
+  - some built in functions for reading/copying memory
+    - for creating labels
+    - inline asm
+  - Macro calls - which differ from function calls only in that they correspond directly to some kind of
+    assembly to be directly injected at the current spot
+      - Can be used for labels or for descriptive direct mappings to instructions
+      - Should contrast function calls in that a function call should always generate assembly that
+        creates a stack frame, pushes arguments and arg length etc
+- "Module" system - basic importing of code - basically how C includes work
+
+
+fn someFn(a, b, c, d) {
+  var x = 0x2; // A push
+  var y = ((a + b) + x);
+  y = d + y;
+
+  #memCpy(from, amount, to);
+
+  #label('labelName')
+
+  return c;
+}
+
+someFn(0x02, 0x04, [dataAddress], {label});
+
+// Sections use datalines but they can be spread over multiple lines
+section aSectionName [0x3000] {
+  anotherName words 0x0001, 0x0002, 0x0005,
+                    0x4444;
+}
+
+
+
+Gramatically:
+
+[x] Assignments
+[x] Arithmetic operations
+[x] Function Definitions
+[ ] Reassignments
+[ ] Function calls
+[ ] Section Definitions
+[ ] Structures
+[ ] Inline assembly
+[ ] Macro calls
+
