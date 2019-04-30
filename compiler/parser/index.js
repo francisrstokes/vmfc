@@ -24,18 +24,27 @@ const {
 
 const translateToAssembly = require('../generator');
 const Scope = require('../generator/scope');
+const ASM = require('../generator/asm');
 
 const {
   ASSIGNMENT_STATEMENT,
   REASSIGNMENT_STATEMENT,
-  BRACKET_EXPR,
+  NEGATED_EXPR,
   ADDITION_EXPR,
   SUBTRACTION_EXPR,
   MULTIPLICATION_EXPR,
   FUNCTION,
+  WHILE_BLOCK,
   IDENTIFIER,
   LITERAL_INT,
   STACK_VARIABLE,
+
+  LESS_THAN_EXPR,
+  GREATER_THAN_EXPR,
+  LESS_THAN_OR_EQUAL_TO_EXPR,
+  GREATER_THAN_OR_EQUAL_TO_EXPR,
+  EQUAL_TO_EXPR,
+  NOT_EQUAL_TO_EXPR,
 } = require('../constants');
 
 const spaceSurrounded = between (possibly(spaces)) (possibly(spaces));
@@ -47,6 +56,8 @@ const createInt = value => ({ type: LITERAL_INT, value });
 const createBinaryExpression = (type, a, b) => ({ type, value: { a, b } });
 const createStackVariable = value => ({ type: STACK_VARIABLE, value });
 const createFunction = (name, args, value) => ({ type: FUNCTION, args, name, value });
+const createWhile = (eqExpr, value) => ({ type: WHILE_BLOCK, eqExpr, value });
+const createNegatedExpression = value => ({ type: NEGATED_EXPR, value });
 
 const identifierP = regex(/^[a-zA-Z_][a-zA-Z0-9_]*/).map(createIdentifier);
 
@@ -66,6 +77,22 @@ const binaryExprP = (operator, type) => recursiveParser(() =>
     ['b', exprP]
   ])).map(({a, b}) => createBinaryExpression(type, a, b))
 );
+
+const equalityExprP = recursiveParser(() => choice([
+  binaryExprP('==', EQUAL_TO_EXPR),
+  binaryExprP('!=', NOT_EQUAL_TO_EXPR),
+  binaryExprP('<', LESS_THAN_EXPR),
+  binaryExprP('>', GREATER_THAN_EXPR),
+  binaryExprP('>=', GREATER_THAN_OR_EQUAL_TO_EXPR),
+  binaryExprP('<=', LESS_THAN_OR_EQUAL_TO_EXPR),
+  negatedExprP,
+  exprP
+]));
+
+const negatedExprP = recursiveParser(() => sequencedNamed([
+  char('!'),
+  ['expr', exprP]
+]).map(({expr}) => createNegatedExpression(expr)));
 
 const exprP = recursiveParser(() => choice([
   binaryExprP('+', ADDITION_EXPR),
@@ -111,12 +138,25 @@ const reassignmentP = doParser(function* () {
   });
 });
 
-const statementP = choice([
+const statementP = recursiveParser(() => choice([
+  whileP,
   assignmentP,
-  reassignmentP
-]);
+  reassignmentP,
+]));
 
-// const whileParser
+const whileP = recursiveParser(() => doParser(function* () {
+  yield regex(/^while[ ]+\(/);
+  const expr = yield equalityExprP;
+  yield regex(/^\)[ ]*\{[ \n\t]+/);
+
+  const statements = yield many(
+    takeLeft (statementP) (regex(/^[ \n\t]*/))
+  );
+
+  yield regex(/^}[ \n\t]+/);
+
+  return Parser.of(createWhile(expr, statements));
+}));
 
 const functionP = doParser(function* () {
   yield regex(/^fn[ ]+/);
@@ -130,7 +170,7 @@ const functionP = doParser(function* () {
   yield regex(/^[ ]*\{[ \n\t]+/);
 
   const statements = yield many(
-    takeLeft (statementP) (regex(/^[ \n\t]+/))
+    takeLeft (statementP) (regex(/^[ \n\t]*/))
   );
 
   const returnStatement = yield takeRight
@@ -146,23 +186,38 @@ const functionP = doParser(function* () {
 
 
 const src = [
-  'fn someFnName (a, b) {',
-  '  var x = ($a + 0x5);',
-  '  x = ($x + 1);',
-  '  return (($x * $b) + $a);',
-  '}',
+  'fn diff (a, b) {',
+  '  var x = 0;',
+  '  while (!$a) {',
+  '    x = ($x + 1);',
+  '    a = ($a + 1);',
+  '    while (!$b) {',
+  '      var hello = 0x05;',
+  '    }',
+  '  }',
+  '  return 0x42;',
+  '}'
 ].join('\n');
+
 
 console.log(src);
 
-
+console.log(
 functionP
   .run(src)
-  .map(x => translateToAssembly(x, new Scope(), ''))
+  .map(x => translateToAssembly(x, new Scope(), new ASM()))
   .map(x => {
-    console.log(x);
+    console.log(x.getCode());
     return x;
   })
-
+)
+// console.log(
+// const s = new Scope();
+// s.addVariable('s', 'ASSIGNMENT');
+// whileP
+//   .run(src)
+//   .map(x => translateToAssembly(x, s, new ASM()))
+//   .map(x => console.log(x.getCode()))
+// )
 
 debugger;

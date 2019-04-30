@@ -237,6 +237,15 @@ const instructionTable = {
       return false;
     },
 
+    [instructions.JZ]: function () {
+      const jmpAddress = this.pop();
+      const checkValue = this.pop();
+      if (checkValue === 0) {
+        this.ip = jmpAddress;
+      }
+      return false;
+    },
+
     [instructions.JEQ]: function () {
       const jmpAddress = this.pop();
       const comparisonValue = this.pop();

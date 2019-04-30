@@ -37,6 +37,7 @@ const NOP   = nextOpcode++; // Noop
 
 // Branching
 const JNZ   = nextOpcode++; // Jump if not zero
+const JZ    = nextOpcode++; // Jump if zero
 const JMP   = nextOpcode++; // Set the instruction pointer
 const JEQ   = nextOpcode++; // Jump if equal
 const JNE   = nextOpcode++; // Jump if not equal
@@ -68,6 +69,7 @@ module.exports = {
   IIP,
   DIP,
   JNZ,
+  JZ,
   JMP,
   SSP,
   PMS,

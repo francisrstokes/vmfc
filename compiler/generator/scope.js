@@ -29,7 +29,7 @@ class Scope {
   fork() {
     const forkedScope = new Scope();
     forkedScope.address = this.address;
-    forkedScope.vars = { ...forkedScope.vars };
+    forkedScope.vars = { ...this.vars };
     return forkedScope;
   }
 }
