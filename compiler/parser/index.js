@@ -45,7 +45,7 @@ const createIdentifier = identifier => ({ type: IDENTIFIER, value: identifier })
 const createInt = value => ({ type: LITERAL_INT, value });
 const createBinaryExpression = (type, a, b) => ({ type, value: { a, b } });
 const createStackVariable = value => ({ type: STACK_VARIABLE, value });
-const createFunction = (name, args, value) => ({ type: FUNCTION, name, value });
+const createFunction = (name, args, value) => ({ type: FUNCTION, args, name, value });
 
 const identifierP = regex(/^[a-zA-Z_][a-zA-Z0-9_]*/).map(createIdentifier);
 
@@ -96,12 +96,10 @@ const assignmentP = doParser(function* () {
 
 const reassignmentP = doParser(function* () {
   const identifier = yield identifierP;
-  yield spaces;
-  yield char('=');
-  yield spaces;
+  yield regex(/^[ ]+=[ ]+/);
 
   const value = yield exprP;
-  yield spaces;
+  yield possibly(spaces);
 
   yield char(';');
 
@@ -111,6 +109,11 @@ const reassignmentP = doParser(function* () {
     value
   });
 });
+
+const statementP = choice([
+  assignmentP,
+  reassignmentP
+]);
 
 const functionP = doParser(function* () {
   yield regex(/^fn[ ]+/);
@@ -124,38 +127,39 @@ const functionP = doParser(function* () {
   yield regex(/^[ ]*\{[ \n\t]+/);
 
   const statements = yield many(
-    takeLeft (assignmentP) (regex(/^[ \n\t]+/))
+    takeLeft (statementP) (regex(/^[ \n\t]+/))
   );
 
-  const returnStatement = yield takeRight (regex(/^return[ ]+/)) (
-    takeLeft(exprP)(regex(/^[ ]*;[ \t\n]+}/))
-  );
+  const returnStatement = yield takeRight
+    (regex(/^return[ ]+/)) (
+      takeLeft (exprP) (regex(/^[ ]*;[ \t\n]+}/))
+    );
 
-  return Parser.of({
-    type: FUNCTION,
-    name: identifier,
-    args,
-    value: [
-      ...statements,
-      returnStatement
-    ]
-  });
+  return Parser.of(createFunction(identifier, args, [
+    ...statements,
+    returnStatement
+  ]));
 })
 
 
 const src = [
   'fn someFnName (a, b) {',
   '  var x = ($a + 0x5);',
+  '  x = ($x + 1);',
   '  return (($x * $b) + $a);',
   '}',
 ].join('\n');
 
 console.log(src);
 
-console.log(
-  functionP
-    .run(src)
-    .map(x => translateToAssembly(x, {}, ''))
-)
+
+functionP
+  .run(src)
+  .map(x => translateToAssembly(x, {}, ''))
+  .map(x => {
+    console.log(x);
+    return x;
+  })
+
 
 debugger;

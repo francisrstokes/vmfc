@@ -23,16 +23,13 @@ const nextStackAddress = scope => {
 
 const translations = {
   expr: (expr, scope, asm) => {
-    if (expr.type === FUNCTION) {
-      return translations.function(expr, asm);
-    } else if (expr.type === ASSIGNMENT_STATEMENT) {
-      return translations.assignment(expr, scope, asm);
-    } else if (expr.type === ADDITION_EXPR) {
-      return translations.binaryOperation('add', expr, scope, asm);
-    } else if (expr.type === SUBTRACTION_EXPR) {
-      return translations.binaryOperation('sub', expr, scope, asm);
-    } else if (expr.type === MULTIPLICATION_EXPR) {
-      return translations.binaryOperation('mul', expr, scope, asm);
+    switch (expr.type) {
+      case FUNCTION: return translations.function(expr, asm);
+      case ASSIGNMENT_STATEMENT: return translations.assignment(expr, scope, asm);
+      case REASSIGNMENT_STATEMENT: return translations.reassignment(expr, scope, asm);
+      case ADDITION_EXPR: return translations.binaryOperation('add', expr, scope, asm);
+      case SUBTRACTION_EXPR: return translations.binaryOperation('sub', expr, scope, asm);
+      case MULTIPLICATION_EXPR: return translations.binaryOperation('mul', expr, scope, asm);
     }
     throw new Error(`Unrecognised expression type! ${JSON.stringify(expr, null, '  ')}`);
   },
@@ -69,6 +66,17 @@ const translations = {
         type: 'ASSIGNMENT',
         cpsAddress: nextStackAddress(scope)
       };
+    }
+    return asm;
+  },
+
+  reassignment: (expr, scope, asm) => {
+    if (expr.value.type === LITERAL_INT) {
+      asm += `push 0x${expr.value.value.toString(16)}\n`;
+      asm += `smv ${scope[expr.identifier.value].cpsAddress}\n`;
+    } else if (arithmeticExpressions.includes(expr.value.type)) {
+      asm = translations.expr(expr.value, scope, asm);
+      asm += `smv ${scope[expr.identifier.value].cpsAddress}\n`;
     }
     return asm;
   },
