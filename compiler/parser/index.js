@@ -22,7 +22,8 @@ const {
   sequencedNamed
 } = require('../../assembler/parser/common');
 
-const translateToAssembly = require('../index');
+const translateToAssembly = require('../generator');
+const Scope = require('../generator/scope');
 
 const {
   ASSIGNMENT_STATEMENT,
@@ -115,6 +116,8 @@ const statementP = choice([
   reassignmentP
 ]);
 
+// const whileParser
+
 const functionP = doParser(function* () {
   yield regex(/^fn[ ]+/);
   const identifier = yield identifierP;
@@ -139,7 +142,7 @@ const functionP = doParser(function* () {
     ...statements,
     returnStatement
   ]));
-})
+});
 
 
 const src = [
@@ -155,7 +158,7 @@ console.log(src);
 
 functionP
   .run(src)
-  .map(x => translateToAssembly(x, {}, ''))
+  .map(x => translateToAssembly(x, new Scope(), ''))
   .map(x => {
     console.log(x);
     return x;

@@ -9,17 +9,15 @@ const {
   IDENTIFIER,
   LITERAL_INT,
   STACK_VARIABLE,
-} = require('./constants');
+} = require('../constants');
+
+const Scope = require('./scope');
 
 const arithmeticExpressions = [
   ADDITION_EXPR,
   SUBTRACTION_EXPR,
   MULTIPLICATION_EXPR
 ];
-
-const nextStackAddress = scope => {
-  return `0x${(2 + Object.keys(scope).length * 2).toString(16)}`;
-}
 
 const translations = {
   expr: (expr, scope, asm) => {
@@ -35,13 +33,7 @@ const translations = {
   },
 
   function: (expr, asm) => {
-    const scope = expr.args.reduce((acc, cur) => {
-      acc[cur.value] = {
-        type: 'ARGUMENT',
-        cpsAddress: nextStackAddress(acc)
-      }
-      return acc;
-    }, {});
+    const scope = new Scope(expr.args);
 
     asm += `${expr.name.value}:\n`
 
@@ -49,23 +41,17 @@ const translations = {
       asm = translations.expr(statementExpr, scope, asm);
     }
 
-    asm += 'ret\n';
+    asm += 'ret\n\n';
     return asm;
   },
 
   assignment: (expr, scope, asm) => {
     if (expr.value.type === LITERAL_INT) {
       asm += `push 0x${expr.value.value.toString(16)}\n`;
-      scope[expr.identifier.value] = {
-        type: LITERAL_INT,
-        cpsAddress: nextStackAddress(scope)
-      };
+      scope.addVariable(expr.identifier.value, LITERAL_INT);
     } else if (arithmeticExpressions.includes(expr.value.type)) {
       asm = translations.expr(expr.value, scope, asm);
-      scope[expr.identifier.value] = {
-        type: 'ASSIGNMENT',
-        cpsAddress: nextStackAddress(scope)
-      };
+      scope.addVariable(expr.identifier.value, 'ASSIGNMENT');
     }
     return asm;
   },
@@ -73,10 +59,10 @@ const translations = {
   reassignment: (expr, scope, asm) => {
     if (expr.value.type === LITERAL_INT) {
       asm += `push 0x${expr.value.value.toString(16)}\n`;
-      asm += `smv ${scope[expr.identifier.value].cpsAddress}\n`;
+      asm += `smv ${scope.getHexAddress(expr.identifier.value)}\n`;
     } else if (arithmeticExpressions.includes(expr.value.type)) {
       asm = translations.expr(expr.value, scope, asm);
-      asm += `smv ${scope[expr.identifier.value].cpsAddress}\n`;
+      asm += `smv ${scope.getHexAddress(expr.identifier.value)}\n`;
     }
     return asm;
   },
@@ -86,7 +72,7 @@ const translations = {
       asm += `push 0x${expr.value.a.value.toString(16)}\n`;
     } else if (expr.value.a.type === STACK_VARIABLE) {
       const stackVarName = expr.value.a.value.value;
-      asm += `cps ${scope[stackVarName].cpsAddress}\n`;
+      asm += `cps ${scope.getHexAddress(stackVarName)}\n`;
     } else {
       asm = translations.expr(expr.value.a, scope, asm);
     }
@@ -95,7 +81,7 @@ const translations = {
       asm += `push 0x${expr.value.b.value.toString(16)}\n`;
     } else if (expr.value.b.type === STACK_VARIABLE) {
       const stackVarName = expr.value.b.value.value;
-      asm += `cps ${scope[stackVarName].cpsAddress}\n`;
+      asm += `cps ${scope.getHexAddress(stackVarName)}\n`;
     } else {
       asm = translations.expr(expr.value.b, scope, asm);
     }
