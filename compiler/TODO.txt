@@ -41,8 +41,9 @@ Gramatically:
 [x] Assignments
 [x] Arithmetic operations
 [x] Function Definitions
-[ ] Reassignments
-[ ] Function calls
+[x] Reassignments
+[x] While loops
+[x] Function calls
 [ ] Section Definitions
 [ ] Structures
 [ ] Inline assembly

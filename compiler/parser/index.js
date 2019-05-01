@@ -14,7 +14,8 @@ const {
   takeRight,
   many,
   sepBy,
-  between
+  between,
+  tapParser
 } = require('arcsecond');
 const {
   doParser,
@@ -34,10 +35,12 @@ const {
   SUBTRACTION_EXPR,
   MULTIPLICATION_EXPR,
   FUNCTION,
+  FUNCTION_CALL,
   WHILE_BLOCK,
   IDENTIFIER,
   LITERAL_INT,
   STACK_VARIABLE,
+  LABEL_REFERENCE,
 
   LESS_THAN_EXPR,
   GREATER_THAN_EXPR,
@@ -50,14 +53,17 @@ const {
 const spaceSurrounded = between (possibly(spaces)) (possibly(spaces));
 const bracketed = between (spaceSurrounded(char('('))) (spaceSurrounded(char(')')));
 const strictBracketed = between (char('(')) (char(')'));
+const strictCurlyBracketed = between (char('{')) (char('}'));
 
 const createIdentifier = identifier => ({ type: IDENTIFIER, value: identifier });
 const createInt = value => ({ type: LITERAL_INT, value });
 const createBinaryExpression = (type, a, b) => ({ type, value: { a, b } });
 const createStackVariable = value => ({ type: STACK_VARIABLE, value });
 const createFunction = (name, args, value) => ({ type: FUNCTION, args, name, value });
+const createFunctionCall = (name, args) => ({ type: FUNCTION_CALL, args, name });
 const createWhile = (eqExpr, value) => ({ type: WHILE_BLOCK, eqExpr, value });
 const createNegatedExpression = value => ({ type: NEGATED_EXPR, value });
+const createLabelReference = value => ({ type: LABEL_REFERENCE, value });
 
 const identifierP = regex(/^[a-zA-Z_][a-zA-Z0-9_]*/).map(createIdentifier);
 
@@ -94,6 +100,8 @@ const negatedExprP = recursiveParser(() => sequencedNamed([
   ['expr', exprP]
 ]).map(({expr}) => createNegatedExpression(expr)));
 
+const labelReferenceP = strictCurlyBracketed(identifierP).map(createLabelReference);
+
 const exprP = recursiveParser(() => choice([
   binaryExprP('+', ADDITION_EXPR),
   binaryExprP('-', SUBTRACTION_EXPR),
@@ -102,6 +110,8 @@ const exprP = recursiveParser(() => choice([
   intP,
   stackVariableP,
 
+  functionCallP,
+  labelReferenceP,
   bracketed(exprP)
 ]));
 
@@ -113,7 +123,7 @@ const assignmentP = doParser(function* () {
   const value = yield exprP;
   yield possibly(spaces);
 
-  yield char(';');
+  yield regex(/^[ \n\t]*;/)
 
   return Parser.of({
     type: ASSIGNMENT_STATEMENT,
@@ -140,12 +150,14 @@ const reassignmentP = doParser(function* () {
 
 const statementP = recursiveParser(() => choice([
   whileP,
+  functionCallP,
   assignmentP,
   reassignmentP,
 ]));
 
 const whileP = recursiveParser(() => doParser(function* () {
-  yield regex(/^while[ ]+\(/);
+  yield tapParser(console.log);
+  yield regex(/^while[ ]*\(/);
   const expr = yield equalityExprP;
   yield regex(/^\)[ ]*\{[ \n\t]+/);
 
@@ -175,7 +187,7 @@ const functionP = doParser(function* () {
 
   const returnStatement = yield takeRight
     (regex(/^return[ ]+/)) (
-      takeLeft (exprP) (regex(/^[ ]*;[ \t\n]+}/))
+      takeLeft (exprP) (regex(/^[ ]*;[ \t\n]*}/))
     );
 
   return Parser.of(createFunction(identifier, args, [
@@ -184,16 +196,20 @@ const functionP = doParser(function* () {
   ]));
 });
 
+const functionCallP = doParser(function* () {
+  const identifier = yield identifierP;
+  const args = yield strictBracketed(
+    sepBy(char(','))(spaceSurrounded(exprP))
+  );
+  yield regex(/^[ \t\n]*/);
+  return Parser.of(createFunctionCall(identifier, args));
+});
+
 
 const src = [
   'fn diff (a, b) {',
-  '  var x = 0;',
-  '  while (!$a) {',
-  '    x = ($x + 1);',
+  '  while (someFunction(0x03, {a_label})) {',
   '    a = ($a + 1);',
-  '    while (!$b) {',
-  '      var hello = 0x05;',
-  '    }',
   '  }',
   '  return 0x42;',
   '}'

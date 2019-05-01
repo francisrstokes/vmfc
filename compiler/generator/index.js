@@ -1,5 +1,6 @@
 const {
   FUNCTION,
+  FUNCTION_CALL,
   WHILE_BLOCK,
   NEGATED_EXPR,
   ASSIGNMENT_STATEMENT,
@@ -15,6 +16,7 @@ const {
   GREATER_THAN_OR_EQUAL_TO_EXPR,
   EQUAL_TO_EXPR,
   NOT_EQUAL_TO_EXPR,
+  LABEL_REFERENCE
 } = require('../constants');
 
 const Scope = require('./scope');
@@ -31,9 +33,11 @@ const $ = {};
 
 $.expr = (expr, scope, asm) => {
   switch (expr.type) {
+    case LABEL_REFERENCE: return $.labelReference(expr, scope, asm);
     case LITERAL_INT: return $.literalInt(expr, scope, asm);
     case STACK_VARIABLE: return $.stackVariable(expr, scope, asm);
     case FUNCTION: return $.function(expr, asm);
+    case FUNCTION_CALL: return $.functionCall(expr, scope, asm);
     case WHILE_BLOCK: return $.while(expr, scope, asm);
     case ASSIGNMENT_STATEMENT: return $.assignment(expr, scope, asm);
     case REASSIGNMENT_STATEMENT: return $.reassignment(expr, scope, asm);
@@ -58,13 +62,13 @@ $.function = (expr, asm) => {
   return asm;
 };
 
-const whileExpressionTable = {
-  [EQUAL_TO_EXPR]: 'jne',
-  [NOT_EQUAL_TO_EXPR]: 'jeq',
-  [LESS_THAN_EXPR]: 'jge',
-  [GREATER_THAN_EXPR]: 'jle',
-  [LESS_THAN_OR_EQUAL_TO_EXPR]: 'jgt',
-  [GREATER_THAN_OR_EQUAL_TO_EXPR]: 'jlt',
+$.functionCall = (expr, scope, asm) => {
+  asm.add(`;; call ${expr.name.value}`);
+  expr.args.forEach(argExpr => $.expr(argExpr, scope, asm));
+  asm.add(`push 0x${expr.args.length.toString(16)}`);
+  asm.add(`push {${expr.name.value}}`);
+  asm.add('call');
+  return asm;
 };
 
 $.while = (expr, scope, asm) => {
@@ -147,7 +151,7 @@ $.assignment = (expr, scope, asm) => {
   if (expr.value.type === LITERAL_INT) {
     asm.add(`push 0x${expr.value.value.toString(16)}`);
     scope.addVariable(expr.identifier.value, LITERAL_INT);
-  } else if (arithmeticExpressions.includes(expr.value.type)) {
+  } else {
     $.expr(expr.value, scope, asm);
     scope.addVariable(expr.identifier.value, 'ASSIGNMENT');
   }
@@ -196,6 +200,11 @@ $.stackVariable = (expr, scope, asm) => {
 
 $.literalInt = (expr, scope, asm) => {
   asm.add(`push 0x${expr.value.toString(16)}`);
+  return asm;
+};
+
+$.labelReference = (expr, scope, asm) => {
+  asm.add(`push {${expr.value.value}}`);
   return asm;
 };
 
