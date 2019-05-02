@@ -23,6 +23,11 @@ const {
   sequencedNamed
 } = require('../../assembler/parser/common');
 
+const debuggingParser = tapParser(([index, str, last]) => {
+  console.log(`Last value: ${last}`);
+  console.log(`The rest: ${str.slice(index)}`);
+})
+
 const translateToAssembly = require('../generator');
 const Scope = require('../generator/scope');
 const ASM = require('../generator/asm');
@@ -37,6 +42,7 @@ const {
   FUNCTION,
   FUNCTION_CALL,
   WHILE_BLOCK,
+  IF_ELSE_BLOCK,
   IDENTIFIER,
   LITERAL_INT,
   STACK_VARIABLE,
@@ -62,6 +68,7 @@ const createStackVariable = value => ({ type: STACK_VARIABLE, value });
 const createFunction = (name, args, value) => ({ type: FUNCTION, args, name, value });
 const createFunctionCall = (name, args) => ({ type: FUNCTION_CALL, args, name });
 const createWhile = (eqExpr, value) => ({ type: WHILE_BLOCK, eqExpr, value });
+const createIfElse = (eqExpr, ifStatements, elseStatements) => ({ type: IF_ELSE_BLOCK, eqExpr, ifStatements, elseStatements });
 const createNegatedExpression = value => ({ type: NEGATED_EXPR, value });
 const createLabelReference = value => ({ type: LABEL_REFERENCE, value });
 
@@ -150,13 +157,34 @@ const reassignmentP = doParser(function* () {
 
 const statementP = recursiveParser(() => choice([
   whileP,
+  ifP,
   functionCallP,
   assignmentP,
   reassignmentP,
 ]));
 
+const ifP = recursiveParser(() => doParser(function* () {
+  yield regex(/^if[ ]*\(/);
+  const expr = yield equalityExprP;
+  yield regex(/^\)[ ]*\{[ \n\t]*/);
+  const ifStatements = yield many(
+    takeLeft (statementP) (regex(/^[ \n\t]*/))
+  );
+  yield regex(/^}[ \n\t]*/);
+  const hasElse = yield possibly(regex(/^else[ \n\t]+{[ \n\t]*/)).map(x => x !== null);
+
+  let elseStatements = [];
+  if (hasElse) {
+    elseStatements = yield many(
+      takeLeft (statementP) (regex(/^[ \n\t]*/))
+    );
+    yield regex(/^}[ \n\t]*/);
+  }
+
+  return Parser.of(createIfElse(expr, ifStatements, elseStatements));
+}));
+
 const whileP = recursiveParser(() => doParser(function* () {
-  yield tapParser(console.log);
   yield regex(/^while[ ]*\(/);
   const expr = yield equalityExprP;
   yield regex(/^\)[ ]*\{[ \n\t]+/);
@@ -205,20 +233,22 @@ const functionCallP = doParser(function* () {
   return Parser.of(createFunctionCall(identifier, args));
 });
 
-
 const src = [
   'fn diff (a, b) {',
-  '  while (someFunction(0x03, {a_label})) {',
-  '    a = ($a + 1);',
+  '  if ($a) {',
+  '    b = 42;',
+  '  } else {',
+  '    a = 55;',
   '  }',
+  '  var annet = 31;',
+  '  annet = ($annet - 10);',
   '  return 0x42;',
   '}'
 ].join('\n');
 
+console.log(src + '\n\n');
 
-console.log(src);
-
-console.log(
+// console.log(
 functionP
   .run(src)
   .map(x => translateToAssembly(x, new Scope(), new ASM()))
@@ -226,7 +256,7 @@ functionP
     console.log(x.getCode());
     return x;
   })
-)
+// )
 // console.log(
 // const s = new Scope();
 // s.addVariable('s', 'ASSIGNMENT');

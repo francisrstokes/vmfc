@@ -17,6 +17,7 @@ const NOT_EQUAL_TO_EXPR = 'not_equal_to_expr';
 const FUNCTION = 'function';
 const FUNCTION_CALL = 'function_call';
 const WHILE_BLOCK = 'while_block';
+const IF_ELSE_BLOCK = 'if_else_block';
 const IDENTIFIER = 'identifier';
 const LITERAL_INT = 'literal_int';
 const STACK_VARIABLE = 'stack_variable';
@@ -39,6 +40,7 @@ module.exports = {
   FUNCTION,
   FUNCTION_CALL,
   WHILE_BLOCK,
+  IF_ELSE_BLOCK,
   IDENTIFIER,
   LITERAL_INT,
   STACK_VARIABLE,

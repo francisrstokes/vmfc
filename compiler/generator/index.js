@@ -1,6 +1,7 @@
 const {
   FUNCTION,
   FUNCTION_CALL,
+  IF_ELSE_BLOCK,
   WHILE_BLOCK,
   NEGATED_EXPR,
   ASSIGNMENT_STATEMENT,
@@ -31,6 +32,65 @@ const arithmeticExpressions = [
 
 const $ = {};
 
+const jumpExpression = (label, expr, scope, asm) => {
+  switch (expr.type) {
+    case EQUAL_TO_EXPR: {
+      $.expr(expr.value.a, scope, asm);
+      $.expr(expr.value.b, scope, asm);
+      asm.add(`push {${label}}`);
+      asm.add('jne');
+      break;
+    }
+    case NOT_EQUAL_TO_EXPR: {
+      $.expr(expr.value.a, scope, asm);
+      $.expr(expr.value.b, scope, asm);
+      asm.add(`push {${label}}`);
+      asm.add('jeq');
+      break;
+    }
+    case LESS_THAN_EXPR: {
+      $.expr(expr.value.a, scope, asm);
+      $.expr(expr.value.b, scope, asm);
+      asm.add(`push {${label}}`);
+      asm.add('jge');
+      break;
+    }
+    case GREATER_THAN_EXPR: {
+      $.expr(expr.value.a, scope, asm);
+      $.expr(expr.value.b, scope, asm);
+      asm.add(`push {${label}}`);
+      asm.add('jle');
+      break;
+    }
+    case LESS_THAN_OR_EQUAL_TO_EXPR: {
+      $.expr(expr.value.a, scope, asm);
+      $.expr(expr.value.b, scope, asm);
+      asm.add(`push {${label}}`);
+      asm.add('jgt');
+      break;
+    }
+    case GREATER_THAN_OR_EQUAL_TO_EXPR: {
+      $.expr(expr.value.a, scope, asm);
+      $.expr(expr.value.b, scope, asm);
+      asm.add(`push {${label}}`);
+      asm.add('jlt');
+      break;
+    }
+    case NEGATED_EXPR: {
+      $.expr(expr.value, scope, asm);
+      asm.add(`push {${label}}`);
+      asm.add('jnz');
+      break;
+    }
+    default: {
+      $.expr(expr, scope, asm);
+      asm.add(`push {${label}}`);
+      asm.add('jz');
+    }
+  }
+  return asm;
+}
+
 $.expr = (expr, scope, asm) => {
   switch (expr.type) {
     case LABEL_REFERENCE: return $.labelReference(expr, scope, asm);
@@ -38,6 +98,7 @@ $.expr = (expr, scope, asm) => {
     case STACK_VARIABLE: return $.stackVariable(expr, scope, asm);
     case FUNCTION: return $.function(expr, asm);
     case FUNCTION_CALL: return $.functionCall(expr, scope, asm);
+    case IF_ELSE_BLOCK: return $.ifElse(expr, scope, asm);
     case WHILE_BLOCK: return $.while(expr, scope, asm);
     case ASSIGNMENT_STATEMENT: return $.assignment(expr, scope, asm);
     case REASSIGNMENT_STATEMENT: return $.reassignment(expr, scope, asm);
@@ -77,61 +138,7 @@ $.while = (expr, scope, asm) => {
 
   asm.label(`while_${id}`);
 
-  switch (expr.eqExpr.type) {
-    case EQUAL_TO_EXPR: {
-      $.expr(expr.eqExpr.value.a, scope, asm);
-      $.expr(expr.eqExpr.value.b, scope, asm);
-      asm.add(`push {while_${id}_end}`);
-      asm.add('jne');
-      break;
-    }
-    case NOT_EQUAL_TO_EXPR: {
-      $.expr(expr.eqExpr.value.a, scope, asm);
-      $.expr(expr.eqExpr.value.b, scope, asm);
-      asm.add(`push {while_${id}_end}`);
-      asm.add('jeq');
-      break;
-    }
-    case LESS_THAN_EXPR: {
-      $.expr(expr.eqExpr.value.a, scope, asm);
-      $.expr(expr.eqExpr.value.b, scope, asm);
-      asm.add(`push {while_${id}_end}`);
-      asm.add('jge');
-      break;
-    }
-    case GREATER_THAN_EXPR: {
-      $.expr(expr.eqExpr.value.a, scope, asm);
-      $.expr(expr.eqExpr.value.b, scope, asm);
-      asm.add(`push {while_${id}_end}`);
-      asm.add('jle');
-      break;
-    }
-    case LESS_THAN_OR_EQUAL_TO_EXPR: {
-      $.expr(expr.eqExpr.value.a, scope, asm);
-      $.expr(expr.eqExpr.value.b, scope, asm);
-      asm.add(`push {while_${id}_end}`);
-      asm.add('jgt');
-      break;
-    }
-    case GREATER_THAN_OR_EQUAL_TO_EXPR: {
-      $.expr(expr.eqExpr.value.a, scope, asm);
-      $.expr(expr.eqExpr.value.b, scope, asm);
-      asm.add(`push {while_${id}_end}`);
-      asm.add('jlt');
-      break;
-    }
-    case NEGATED_EXPR: {
-      $.expr(expr.eqExpr.value, scope, asm);
-      asm.add(`push {while_${id}_end}`);
-      asm.add('jnz');
-      break;
-    }
-    default: {
-      $.expr(expr.eqExpr, scope, asm);
-      asm.add(`push {while_${id}_end}`);
-      asm.add('jz');
-    }
-  }
+  jumpExpression(`while_${id}_end`, expr.eqExpr, scope, asm);
 
   for (let statementExpr of expr.value) {
     $.expr(statementExpr, newScope, asm);
@@ -146,6 +153,31 @@ $.while = (expr, scope, asm) => {
 
   return asm;
 };
+
+$.ifElse = (expr, scope, asm) => {
+  const id = randomId();
+  const ifLabel = `if_${id}`;
+  const elseLabel = `else_${id}`;
+  const fiLabel = `fi_${id}`;
+
+  jumpExpression(elseLabel, expr.eqExpr, scope, asm);
+
+  asm.label(ifLabel);
+  const ifScope = scope.fork();
+  expr.ifStatements.forEach(ifExpr => $.expr(ifExpr, ifScope, asm));
+  asm.add(`push {${fiLabel}}`);
+  asm.add('jmp');
+  asm.unindent();
+
+  asm.label(elseLabel);
+  const elseScope = scope.fork();
+  expr.elseStatements.forEach(elseExpr => $.expr(elseExpr, elseScope, asm));
+  asm.unindent();
+  asm.label(fiLabel);
+  asm.unindent();
+
+  return asm;
+}
 
 $.assignment = (expr, scope, asm) => {
   if (expr.value.type === LITERAL_INT) {

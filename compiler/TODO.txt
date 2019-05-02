@@ -44,6 +44,7 @@ Gramatically:
 [x] Reassignments
 [x] While loops
 [x] Function calls
+[x] If/Else Blocks
 [ ] Section Definitions
 [ ] Structures
 [ ] Inline assembly
