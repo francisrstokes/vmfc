@@ -1,5 +1,6 @@
 const ASSIGNMENT_STATEMENT = 'assignment_statement';
 const REASSIGNMENT_STATEMENT = 'reassignment_statement';
+const RETURN_STATEMENT = 'return_statement';
 
 const BRACKET_EXPR = 'bracketed_expr';
 const LABEL_REFERENCE = 'label_reference';
@@ -26,6 +27,7 @@ const INDEXED_STACK_VARIABLE = 'indexed_stack_variable';
 module.exports = {
   ASSIGNMENT_STATEMENT,
   REASSIGNMENT_STATEMENT,
+  RETURN_STATEMENT,
   BRACKET_EXPR,
   LABEL_REFERENCE,
   NEGATED_EXPR,

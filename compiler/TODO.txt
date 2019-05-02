@@ -10,12 +10,20 @@ Reassignments               [x]         [x]
 While loops                 [x]         [x]
 Function calls              [x]         [x]
 If/Else Blocks              [x]         [x]
-General Return Statements   [ ]         [ ]
-Arrays/Buffers              [ ]         [ ]
+Arrays/Buffers              [x]         [x]
+General Return Statements   [x]         [x]
+Rest of the operations      [ ]         [ ]
 Section Definitions         [ ]         [ ]
 Structures                  [ ]         [ ]
 Macro calls                 [ ]         [ ]
 Whole Program               [ ]         [ ]
+
+
+struct someStruct {
+  x;
+  y[4];
+  z[10];
+}
 
 
 fn someFn(a, b, c, d) {

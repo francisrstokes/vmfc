@@ -35,6 +35,8 @@ const ASM = require('../generator/asm');
 const {
   ASSIGNMENT_STATEMENT,
   REASSIGNMENT_STATEMENT,
+  RETURN_STATEMENT,
+
   NEGATED_EXPR,
   ADDITION_EXPR,
   SUBTRACTION_EXPR,
@@ -74,6 +76,7 @@ const createWhile = (eqExpr, value) => ({ type: WHILE_BLOCK, eqExpr, value });
 const createIfElse = (eqExpr, ifStatements, elseStatements) => ({ type: IF_ELSE_BLOCK, eqExpr, ifStatements, elseStatements });
 const createNegatedExpression = value => ({ type: NEGATED_EXPR, value });
 const createLabelReference = value => ({ type: LABEL_REFERENCE, value });
+const createReturn = value => ({ type: RETURN_STATEMENT, value });
 
 const identifierP = regex(/^[a-zA-Z_][a-zA-Z0-9_]*/).map(createIdentifier);
 
@@ -195,7 +198,15 @@ const reassignmentP = doParser(function* () {
   });
 });
 
+const returnP = recursiveParser(() => doParser(function* () {
+  yield regex(/^return[ ]+/);
+  const expr = yield exprP;
+  yield regex(/^[ \t\n]*;[ \t\n]*/)
+  return Parser.of(createReturn(expr));
+}));
+
 const statementP = recursiveParser(() => choice([
+  returnP,
   whileP,
   ifP,
   functionCallP,
@@ -253,15 +264,7 @@ const functionP = doParser(function* () {
     takeLeft (statementP) (regex(/^[ \n\t]*/))
   );
 
-  const returnStatement = yield takeRight
-    (regex(/^return[ ]+/)) (
-      takeLeft (exprP) (regex(/^[ ]*;[ \t\n]*}/))
-    );
-
-  return Parser.of(createFunction(identifier, args, [
-    ...statements,
-    returnStatement
-  ]));
+  return Parser.of(createFunction(identifier, args, statements));
 });
 
 const functionCallP = doParser(function* () {
@@ -275,10 +278,12 @@ const functionCallP = doParser(function* () {
 
 
 const src = [
-  'fn diff (a, b) {',
-  '  var x[3];',
-  '  x[0] = x[0];',
-  '  return 0x42;',
+  'fn aIfEqual (a, b) {',
+  '  if ((a == b)) {',
+  '    return a;',
+  '  } else {',
+  '    return b;',
+  '  }',
   '}'
 ].join('\n');
 

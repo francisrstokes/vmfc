@@ -6,6 +6,7 @@ const {
   NEGATED_EXPR,
   ASSIGNMENT_STATEMENT,
   REASSIGNMENT_STATEMENT,
+  RETURN_STATEMENT,
   ADDITION_EXPR,
   SUBTRACTION_EXPR,
   MULTIPLICATION_EXPR,
@@ -98,6 +99,7 @@ $.expr = (expr, scope, asm) => {
     case WHILE_BLOCK: return $.while(expr, scope, asm);
     case ASSIGNMENT_STATEMENT: return $.assignment(expr, scope, asm);
     case REASSIGNMENT_STATEMENT: return $.reassignment(expr, scope, asm);
+    case RETURN_STATEMENT: return $.return(expr, scope, asm);
     case ADDITION_EXPR: return $.binaryOperation('add', expr, scope, asm);
     case SUBTRACTION_EXPR: return $.binaryOperation('sub', expr, scope, asm);
     case MULTIPLICATION_EXPR: return $.binaryOperation('mul', expr, scope, asm);
@@ -114,7 +116,6 @@ $.function = (expr, asm) => {
     $.expr(statementExpr, scope, asm);
   }
 
-  asm.add('ret');
   asm.unindent();
   return asm;
 };
@@ -270,6 +271,12 @@ $.literalInt = (expr, scope, asm) => {
 
 $.labelReference = (expr, scope, asm) => {
   asm.add(`push {${expr.value.value}}`);
+  return asm;
+};
+
+$.return = (expr, scope, asm) => {
+  $.expr(expr.value, scope, asm);
+  asm.add('ret');
   return asm;
 };
 
