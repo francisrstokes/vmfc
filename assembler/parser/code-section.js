@@ -23,6 +23,7 @@ const {
   sequencedNamed
 } = require('./common');
 
+const instructionDescriptions = require('../../src/instructions/descriptions');
 
 const validLabel = regex(/^[a-zA-Z0-9\-_]+/)
 
@@ -76,7 +77,7 @@ const singleInstruction = instruction =>
   sequencedNamed([
     possibly(Whitespace),
     choice([
-      str(instruction),
+      str(instruction.toLowerCase()),
       str(instruction.toUpperCase()),
     ]),
     possibly(Whitespace),
@@ -93,7 +94,7 @@ const argumentInstruction = instruction =>
   sequencedNamed([
     possibly(Whitespace),
     choice([
-      str(instruction),
+      str(instruction.toLowerCase()),
       str(instruction.toUpperCase()),
     ]),
     Whitespace,
@@ -107,48 +108,18 @@ const argumentInstruction = instruction =>
     endOfLineComment: comment
   }));
 
+
+const instructionParsers = instructionDescriptions.map(({instruction, argument}) => {
+  return argument
+    ? argumentInstruction(instruction)
+    : singleInstruction(instruction)
+});
+
 const codeSectionItem = takeLeft(choice([
   commentNoNewline,
   label,
-  argumentInstruction('push'),
-  argumentInstruction('cps'),
-  argumentInstruction('smv'),
-  singleInstruction('pip'),
-  singleInstruction('psp'),
-  singleInstruction('add'),
-  singleInstruction('inc'),
-  singleInstruction('dec'),
-  singleInstruction('mul'),
-  singleInstruction('sub'),
-  singleInstruction('lsf'),
-  singleInstruction('rsf'),
-  singleInstruction('call'),
-  singleInstruction('ret'),
-  singleInstruction('isp'),
-  singleInstruction('dsp'),
-  singleInstruction('iip'),
-  singleInstruction('dip'),
-  singleInstruction('jnz'),
-  singleInstruction('jmp'),
-  singleInstruction('ssp'),
-  singleInstruction('pms'),
-  singleInstruction('pmf'),
-  singleInstruction('msm'),
-  singleInstruction('jeq'),
-  singleInstruction('jne'),
-  singleInstruction('jgt'),
-  singleInstruction('jlt'),
-  singleInstruction('jge'),
-  singleInstruction('jle'),
-  singleInstruction('and'),
-  singleInstruction('or'),
-  singleInstruction('xor'),
-  singleInstruction('not'),
-  singleInstruction('halt'),
-  singleInstruction('dbg'),
-  singleInstruction('nop'),
+  ...instructionParsers
 ])) (newlines);
-
 
 module.exports = doParser(function* () {
   yield whitespace;
