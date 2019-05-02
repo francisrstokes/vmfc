@@ -245,6 +245,12 @@ const descriptions = [
     opcode: nextOpcode++,
     argument: false,
     instruction: "CPOS"
+  },
+  {
+    // Move stack to offset - Like SMV, but offset is based on the value at the top of the stack
+    opcode: nextOpcode++,
+    argument: false,
+    instruction: "SMVO"
   }
 ];
 

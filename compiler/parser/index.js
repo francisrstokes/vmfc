@@ -6,7 +6,6 @@ const {
   choice,
   digits,
   char,
-  fail,
   possibly,
   Parser,
   recursiveParser,
@@ -15,7 +14,8 @@ const {
   many,
   sepBy,
   between,
-  tapParser
+  tapParser,
+  fail
 } = require('arcsecond');
 const {
   doParser,
@@ -46,6 +46,7 @@ const {
   IDENTIFIER,
   LITERAL_INT,
   STACK_VARIABLE,
+  INDEXED_STACK_VARIABLE,
   LABEL_REFERENCE,
 
   LESS_THAN_EXPR,
@@ -60,11 +61,13 @@ const spaceSurrounded = between (possibly(spaces)) (possibly(spaces));
 const bracketed = between (spaceSurrounded(char('('))) (spaceSurrounded(char(')')));
 const strictBracketed = between (char('(')) (char(')'));
 const strictCurlyBracketed = between (char('{')) (char('}'));
+const strictSquareBracketed = between (char('[')) (char(']'));
 
 const createIdentifier = identifier => ({ type: IDENTIFIER, value: identifier });
 const createInt = value => ({ type: LITERAL_INT, value });
 const createBinaryExpression = (type, a, b) => ({ type, value: { a, b } });
 const createStackVariable = value => ({ type: STACK_VARIABLE, value });
+const createIndexedStackVariable = (value, index) => ({ type: INDEXED_STACK_VARIABLE, value, index });
 const createFunction = (name, args, value) => ({ type: FUNCTION, args, name, value });
 const createFunctionCall = (name, args) => ({ type: FUNCTION_CALL, args, name });
 const createWhile = (eqExpr, value) => ({ type: WHILE_BLOCK, eqExpr, value });
@@ -79,7 +82,11 @@ const intP = choice([
   digits.map(v => parseInt(v, 10)),
 ]).map(createInt);
 
-const stackVariableP = takeRight(char('$'))(identifierP).map(createStackVariable);
+const stackVariableP = identifierP.map(createStackVariable);
+const indexedStackVariableP = recursiveParser(() => sequencedNamed([
+  ['name', stackVariableP],
+  ['index', strictSquareBracketed(exprP)]
+]).map(({name, index}) => createIndexedStackVariable(name, index)));
 
 const binaryExprP = (operator, type) => recursiveParser(() =>
   strictBracketed(sequencedNamed([
@@ -115,9 +122,10 @@ const exprP = recursiveParser(() => choice([
   binaryExprP('*', MULTIPLICATION_EXPR),
 
   intP,
+  functionCallP,
+  indexedStackVariableP,
   stackVariableP,
 
-  functionCallP,
   labelReferenceP,
   bracketed(exprP)
 ]));
@@ -125,22 +133,53 @@ const exprP = recursiveParser(() => choice([
 const assignmentP = doParser(function* () {
   yield regex(/^var[ ]+/);
   const identifier = yield identifierP;
-  yield regex(/^[ ]+=[ ]+/);
 
+  let nonIntegerReservation = false;
+  let isArray = false;
+  const size = yield possibly(strictSquareBracketed(exprP)).map(x => {
+    if (x === null) return 1;
+    if (x.type !== LITERAL_INT) {
+      nonIntegerReservation = true;
+    }
+    isArray = true;
+    return x.value;
+  });
+
+  if (nonIntegerReservation) {
+    return fail(`Cannot create array '${identifier}' with size  that is a non-integer value`);
+  } else if (size <= 0) {
+    return fail(`Cannot create array '${identifier}' with size <= 0`);
+  }
+
+  if (isArray) {
+    yield regex(/^[ \n\t]*;/);
+    return Parser.of({
+      type: ASSIGNMENT_STATEMENT,
+      identifier,
+      isArray,
+      size,
+      value: createInt(0)
+    });
+  }
+
+  yield regex(/^[ ]+=[ ]+/);
   const value = yield exprP;
   yield possibly(spaces);
-
   yield regex(/^[ \n\t]*;/)
 
   return Parser.of({
     type: ASSIGNMENT_STATEMENT,
     identifier,
+    isArray,
+    size,
     value
   });
 });
 
 const reassignmentP = doParser(function* () {
   const identifier = yield identifierP;
+  const index = yield possibly(strictSquareBracketed(exprP))
+    .map(x => (x === null) ? createInt(0) : x);
   yield regex(/^[ ]+=[ ]+/);
 
   const value = yield exprP;
@@ -150,6 +189,7 @@ const reassignmentP = doParser(function* () {
 
   return Parser.of({
     type: REASSIGNMENT_STATEMENT,
+    index,
     identifier,
     value
   });
@@ -233,15 +273,11 @@ const functionCallP = doParser(function* () {
   return Parser.of(createFunctionCall(identifier, args));
 });
 
+
 const src = [
   'fn diff (a, b) {',
-  '  if ($a) {',
-  '    b = 42;',
-  '  } else {',
-  '    a = 55;',
-  '  }',
-  '  var annet = 31;',
-  '  annet = ($annet - 10);',
+  '  var x[3];',
+  '  x[0] = x[0];',
   '  return 0x42;',
   '}'
 ].join('\n');
@@ -251,6 +287,8 @@ console.log(src + '\n\n');
 // console.log(
 functionP
   .run(src)
+  // .map(console.log)
+  // .leftMap(console.log)
   .map(x => translateToAssembly(x, new Scope(), new ASM()))
   .map(x => {
     console.log(x.getCode());

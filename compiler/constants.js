@@ -21,6 +21,7 @@ const IF_ELSE_BLOCK = 'if_else_block';
 const IDENTIFIER = 'identifier';
 const LITERAL_INT = 'literal_int';
 const STACK_VARIABLE = 'stack_variable';
+const INDEXED_STACK_VARIABLE = 'indexed_stack_variable';
 
 module.exports = {
   ASSIGNMENT_STATEMENT,
@@ -44,4 +45,5 @@ module.exports = {
   IDENTIFIER,
   LITERAL_INT,
   STACK_VARIABLE,
+  INDEXED_STACK_VARIABLE,
 };

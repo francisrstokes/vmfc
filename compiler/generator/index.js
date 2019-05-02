@@ -11,6 +11,7 @@ const {
   MULTIPLICATION_EXPR,
   LITERAL_INT,
   STACK_VARIABLE,
+  INDEXED_STACK_VARIABLE,
   LESS_THAN_EXPR,
   GREATER_THAN_EXPR,
   LESS_THAN_OR_EQUAL_TO_EXPR,
@@ -23,12 +24,6 @@ const {
 const Scope = require('./scope');
 
 const randomId = () => Math.random().toString(16).slice(2);
-
-const arithmeticExpressions = [
-  ADDITION_EXPR,
-  SUBTRACTION_EXPR,
-  MULTIPLICATION_EXPR
-];
 
 const $ = {};
 
@@ -96,6 +91,7 @@ $.expr = (expr, scope, asm) => {
     case LABEL_REFERENCE: return $.labelReference(expr, scope, asm);
     case LITERAL_INT: return $.literalInt(expr, scope, asm);
     case STACK_VARIABLE: return $.stackVariable(expr, scope, asm);
+    case INDEXED_STACK_VARIABLE: return $.indexedStackVariable(expr, scope, asm);
     case FUNCTION: return $.function(expr, asm);
     case FUNCTION_CALL: return $.functionCall(expr, scope, asm);
     case IF_ELSE_BLOCK: return $.ifElse(expr, scope, asm);
@@ -180,6 +176,15 @@ $.ifElse = (expr, scope, asm) => {
 }
 
 $.assignment = (expr, scope, asm) => {
+  if (scope.contains(expr.identifier.value)) {
+    throw new Error(`Variable '${expr.identifier.value}' already exists and cannot be assigned with the var keyword`);
+  }
+
+  if (expr.isArray) {
+    scope.addVariable(expr.identifier.value, LITERAL_INT, expr.size);
+    return asm;
+  }
+
   if (expr.value.type === LITERAL_INT) {
     asm.add(`push 0x${expr.value.value.toString(16)}`);
     scope.addVariable(expr.identifier.value, LITERAL_INT);
@@ -191,13 +196,25 @@ $.assignment = (expr, scope, asm) => {
 };
 
 $.reassignment = (expr, scope, asm) => {
-  if (expr.value.type === LITERAL_INT) {
-    asm.add(`push 0x${expr.value.value.toString(16)}`);
-    asm.add(`smv ${scope.getHexAddress(expr.identifier.value)}`);
-  } else if (arithmeticExpressions.includes(expr.value.type)) {
+  if (!scope.contains(expr.identifier.value)) {
+    throw new Error(`Can't reassign undeclared variable '${expr.identifier.value}'`);
+  }
+
+  if (expr.index.type === LITERAL_INT && expr.index.value === 0) {
     $.expr(expr.value, scope, asm);
     asm.add(`smv ${scope.getHexAddress(expr.identifier.value)}`);
+  } else {
+    // Value on stack first
+    $.expr(expr.value, scope, asm);
+
+    // Then the calcuated address offset
+    $.expr(expr.index, scope, asm);
+    asm.add(`push ${scope.getHexAddress(expr.identifier.value)}`);
+    asm.add('add');
+
+    asm.add('smvo');
   }
+
   return asm;
 };
 
@@ -227,6 +244,22 @@ $.binaryOperation = (binaryInstruction, expr, scope, asm) => {
 
 $.stackVariable = (expr, scope, asm) => {
   asm.add(`cps ${scope.getHexAddress(expr.value.value)}`);
+  return asm;
+};
+
+$.indexedStackVariable = (expr, scope, asm) => {
+  // Short circuit for 0
+  if (expr.index.type === LITERAL_INT && expr.index.value === 0) {
+    $.expr(expr.value, scope, asm);
+    return asm;
+  }
+
+  // Calculate the index
+  $.expr(expr.index, scope, asm);
+  $.expr(expr.value, scope, asm);
+  asm.add('add');
+
+  asm.add('cpos');
   return asm;
 };
 

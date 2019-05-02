@@ -1,17 +1,21 @@
 # Higher level language for assembler
 
-- Basically a small macro language
-- Expose some handy things:
-  - Function declaration and calling facilities
-  - some built in functions for reading/copying memory
-    - for creating labels
-    - inline asm
-  - Macro calls - which differ from function calls only in that they correspond directly to some kind of
-    assembly to be directly injected at the current spot
-      - Can be used for labels or for descriptive direct mappings to instructions
-      - Should contrast function calls in that a function call should always generate assembly that
-        creates a stack frame, pushes arguments and arg length etc
-- "Module" system - basic importing of code - basically how C includes work
+
+Feature                     Parsing     Generating
+--------------------------------------------------
+Assignments                 [x]         [x]
+Arithmetic operations       [x]         [x]
+Function Definitions        [x]         [x]
+Reassignments               [x]         [x]
+While loops                 [x]         [x]
+Function calls              [x]         [x]
+If/Else Blocks              [x]         [x]
+General Return Statements   [ ]         [ ]
+Arrays/Buffers              [ ]         [ ]
+Section Definitions         [ ]         [ ]
+Structures                  [ ]         [ ]
+Macro calls                 [ ]         [ ]
+Whole Program               [ ]         [ ]
 
 
 fn someFn(a, b, c, d) {
@@ -34,19 +38,28 @@ section aSectionName [0x3000] {
                     0x4444;
 }
 
+// Reserves `size` * 2 bytes on the stack
+var name[size] = [x, y, z];
 
 
-Gramatically:
+// Writes to `frame offset of name + 3 * 2`
+name[3] = 0x04;
+// When the index is a literal generator can use CSP / SMV
+// When the index is an expr, generator can use CSOP / SMVO
 
-[x] Assignments
-[x] Arithmetic operations
-[x] Function Definitions
-[x] Reassignments
-[x] While loops
-[x] Function calls
-[x] If/Else Blocks
-[ ] Section Definitions
-[ ] Structures
-[ ] Inline assembly
-[ ] Macro calls
+// Get the address of a variable into the stack
+var addressOfName = &name;
 
+
+- Basically a small macro language
+- Expose some handy things:
+  - Function declaration and calling facilities
+  - some built in functions for reading/copying memory
+    - for creating labels
+    - inline asm
+  - Macro calls - which differ from function calls only in that they correspond directly to some kind of
+    assembly to be directly injected at the current spot
+      - Can be used for labels or for descriptive direct mappings to instructions
+      - Should contrast function calls in that a function call should always generate assembly that
+        creates a stack frame, pushes arguments and arg length etc
+- "Module" system - basic importing of code - basically how C includes work 

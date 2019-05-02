@@ -8,6 +8,12 @@ Exceptions here are ones that copy parts of memory.
 - C-like language that can be used to write code for the VirtualMachineConsole
 - Implement support for dealing with signed values (duplicate instructions that deal with unsigned)
 
+
+
+
+
+
+
 ##### Plan for graphics
 
 - Execute game code until it's time to draw a frame

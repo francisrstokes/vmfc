@@ -61,8 +61,21 @@ const instructionTable = {
       return false;
     },
 
+    [instructions.CPOS]: function () {
+      const offset = this.pop();
+      this.push(this.readU16(this.fp - offset));
+      return false;
+    },
+
     [instructions.SMV]: function () {
       const offset = this.fetch16();
+      const value = this.pop();
+      this.writeU16(this.fp - offset, value);
+      return false;
+    },
+
+    [instructions.SMVO]: function () {
+      const offset = this.pop();
       const value = this.pop();
       this.writeU16(this.fp - offset, value);
       return false;
