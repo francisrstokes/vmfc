@@ -10,6 +10,12 @@ const {
   ADDITION_EXPR,
   SUBTRACTION_EXPR,
   MULTIPLICATION_EXPR,
+  LEFT_SHIFT_EXPR,
+  RIGHT_SHIFT_EXPR,
+  AND_EXPR,
+  OR_EXPR,
+  XOR_EXPR,
+  NOT_EXPR,
   LITERAL_INT,
   STACK_VARIABLE,
   INDEXED_STACK_VARIABLE,
@@ -89,20 +95,26 @@ const jumpExpression = (label, expr, scope, asm) => {
 
 $.expr = (expr, scope, asm) => {
   switch (expr.type) {
-    case LABEL_REFERENCE: return $.labelReference(expr, scope, asm);
-    case LITERAL_INT: return $.literalInt(expr, scope, asm);
-    case STACK_VARIABLE: return $.stackVariable(expr, scope, asm);
-    case INDEXED_STACK_VARIABLE: return $.indexedStackVariable(expr, scope, asm);
-    case FUNCTION: return $.function(expr, asm);
-    case FUNCTION_CALL: return $.functionCall(expr, scope, asm);
-    case IF_ELSE_BLOCK: return $.ifElse(expr, scope, asm);
-    case WHILE_BLOCK: return $.while(expr, scope, asm);
-    case ASSIGNMENT_STATEMENT: return $.assignment(expr, scope, asm);
-    case REASSIGNMENT_STATEMENT: return $.reassignment(expr, scope, asm);
-    case RETURN_STATEMENT: return $.return(expr, scope, asm);
-    case ADDITION_EXPR: return $.binaryOperation('add', expr, scope, asm);
-    case SUBTRACTION_EXPR: return $.binaryOperation('sub', expr, scope, asm);
-    case MULTIPLICATION_EXPR: return $.binaryOperation('mul', expr, scope, asm);
+    case LABEL_REFERENCE:         return $.labelReference(expr, scope, asm);
+    case LITERAL_INT:             return $.literalInt(expr, scope, asm);
+    case STACK_VARIABLE:          return $.stackVariable(expr, scope, asm);
+    case INDEXED_STACK_VARIABLE:  return $.indexedStackVariable(expr, scope, asm);
+    case FUNCTION:                return $.function(expr, asm);
+    case FUNCTION_CALL:           return $.functionCall(expr, scope, asm);
+    case IF_ELSE_BLOCK:           return $.ifElse(expr, scope, asm);
+    case WHILE_BLOCK:             return $.while(expr, scope, asm);
+    case ASSIGNMENT_STATEMENT:    return $.assignment(expr, scope, asm);
+    case REASSIGNMENT_STATEMENT:  return $.reassignment(expr, scope, asm);
+    case RETURN_STATEMENT:        return $.return(expr, scope, asm);
+    case ADDITION_EXPR:           return $.binaryOperation('add', expr, scope, asm);
+    case SUBTRACTION_EXPR:        return $.binaryOperation('sub', expr, scope, asm);
+    case MULTIPLICATION_EXPR:     return $.binaryOperation('mul', expr, scope, asm);
+    case LEFT_SHIFT_EXPR:         return $.binaryOperation('lsf', expr, scope, asm);
+    case RIGHT_SHIFT_EXPR:        return $.binaryOperation('rsf', expr, scope, asm);
+    case AND_EXPR:                return $.binaryOperation('and', expr, scope, asm);
+    case OR_EXPR:                 return $.binaryOperation('or', expr, scope, asm);
+    case XOR_EXPR:                return $.binaryOperation('xor', expr, scope, asm);
+    case NOT_EXPR:                return $.logicalNot(expr, scope, asm);
   }
   throw new Error(`Unrecognised expression type! ${JSON.stringify(expr, null, '  ')}`);
 };
@@ -117,6 +129,7 @@ $.function = (expr, asm) => {
   }
 
   asm.unindent();
+  asm.blankLine();
   return asm;
 };
 
@@ -218,6 +231,12 @@ $.reassignment = (expr, scope, asm) => {
 
   return asm;
 };
+
+$.logicalNot = (expr, scope, asm) => {
+  $.expr(expr.value, scope, asm);
+  asm.add('not');
+  return asm;
+}
 
 $.binaryOperation = (binaryInstruction, expr, scope, asm) => {
   if (expr.value.a.type === LITERAL_INT) {

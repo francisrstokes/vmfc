@@ -5,6 +5,7 @@ const RETURN_STATEMENT = 'return_statement';
 const BRACKET_EXPR = 'bracketed_expr';
 const LABEL_REFERENCE = 'label_reference';
 const NEGATED_EXPR = 'negated_expr';
+
 const ADDITION_EXPR = 'addition_expr';
 const SUBTRACTION_EXPR = 'subtraction_expr';
 const MULTIPLICATION_EXPR = 'multiplication_expr';
@@ -14,6 +15,13 @@ const LESS_THAN_OR_EQUAL_TO_EXPR = 'less_than_or_equal_to_expr';
 const GREATER_THAN_OR_EQUAL_TO_EXPR = 'greater_than_or_equal_to_expr';
 const EQUAL_TO_EXPR = 'equal_to_expr';
 const NOT_EQUAL_TO_EXPR = 'not_equal_to_expr';
+const LEFT_SHIFT_EXPR = 'left_shift_expr';
+const RIGHT_SHIFT_EXPR = 'right_shift_expr';
+const AND_EXPR = 'and_expr';
+const OR_EXPR = 'or_expr';
+const XOR_EXPR = 'xor_expr';
+const NOT_EXPR = 'not_expr';
+
 
 const FUNCTION = 'function';
 const FUNCTION_CALL = 'function_call';
@@ -40,6 +48,12 @@ module.exports = {
   GREATER_THAN_OR_EQUAL_TO_EXPR,
   EQUAL_TO_EXPR,
   NOT_EQUAL_TO_EXPR,
+  LEFT_SHIFT_EXPR,
+  RIGHT_SHIFT_EXPR,
+  AND_EXPR,
+  OR_EXPR,
+  XOR_EXPR,
+  NOT_EXPR,
   FUNCTION,
   FUNCTION_CALL,
   WHILE_BLOCK,

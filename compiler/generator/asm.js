@@ -8,6 +8,10 @@ class ASM {
     this.code.push(`${'  '.repeat(this.indentLevel)}${line}`);
   }
 
+  blankLine() {
+    this.code.push('');
+  }
+
   label(name) {
     this.add(`${name}:`);
     this.indent();

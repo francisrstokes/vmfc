@@ -29,8 +29,8 @@ const validLabel = regex(/^[a-zA-Z0-9\-_]+/)
 
 const label = sequencedNamed([
   whitespace,
-  char(':'),
   ['name', validLabel],
+  char(':'),
   possibly(Whitespace),
   ['comment', possibly(commentNoNewline)],
 ]).map(({comment, name}) => ({
@@ -131,6 +131,8 @@ module.exports = doParser(function* () {
   yield many(choice([ newline, comment ]))
 
   const entries = (yield many(codeSectionItem));
+
+  yield possibly(regex(/^[ \n\t\r]*/));
 
   return Parser.of({
     type: 'code-section',
