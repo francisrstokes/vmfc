@@ -1,4 +1,5 @@
 const {
+  COMMENT,
   FUNCTION,
   FUNCTION_CALL,
   IF_ELSE_BLOCK,
@@ -95,6 +96,7 @@ const jumpExpression = (label, expr, scope, asm) => {
 
 $.expr = (expr, scope, asm) => {
   switch (expr.type) {
+    case COMMENT:                 return $.comment(expr, scope, asm);
     case LABEL_REFERENCE:         return $.labelReference(expr, scope, asm);
     case LITERAL_INT:             return $.literalInt(expr, scope, asm);
     case STACK_VARIABLE:          return $.stackVariable(expr, scope, asm);
@@ -117,6 +119,11 @@ $.expr = (expr, scope, asm) => {
     case NOT_EXPR:                return $.logicalNot(expr, scope, asm);
   }
   throw new Error(`Unrecognised expression type! ${JSON.stringify(expr, null, '  ')}`);
+};
+
+$.comment = (expr, scope, asm) => {
+  asm.comment(expr.value);
+  return asm;
 };
 
 $.function = (expr, asm) => {

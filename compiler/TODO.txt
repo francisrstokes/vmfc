@@ -13,6 +13,9 @@ If/Else Blocks              [x]         [x]
 Arrays/Buffers              [x]         [x]
 General Return Statements   [x]         [x]
 Rest of the operations      [x]         [x]
+Single Line Comments        [ ]         [ ]
+Multi Line Comments         [ ]         [ ]
+End of line comment         [ ]         [ ]
 Section Definitions         [ ]         [ ]
 Structures                  [ ]         [ ]
 Macro calls                 [ ]         [ ]
@@ -30,6 +33,9 @@ fn someFn(a, b, c, d) {
   var x = 0x2; // A push
   var y = ((a + b) + x);
   y = d + y;
+
+  var mem = %read(address);
+  %write(expr, addressExpr);
 
   #memCpy(from, amount, to);
 

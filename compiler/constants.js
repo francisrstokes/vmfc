@@ -1,3 +1,5 @@
+const COMMENT = 'comment';
+
 const ASSIGNMENT_STATEMENT = 'assignment_statement';
 const REASSIGNMENT_STATEMENT = 'reassignment_statement';
 const RETURN_STATEMENT = 'return_statement';
@@ -33,6 +35,7 @@ const STACK_VARIABLE = 'stack_variable';
 const INDEXED_STACK_VARIABLE = 'indexed_stack_variable';
 
 module.exports = {
+  COMMENT,
   ASSIGNMENT_STATEMENT,
   REASSIGNMENT_STATEMENT,
   RETURN_STATEMENT,

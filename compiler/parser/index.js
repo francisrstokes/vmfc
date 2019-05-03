@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const {
+  everythingUntil,
   str,
   regex,
   choice,
@@ -16,6 +17,7 @@ const {
   between,
   tapParser,
   fail,
+  endOfInput
 } = require('arcsecond');
 const {
   doParser,
@@ -33,6 +35,7 @@ const Scope = require('../generator/scope');
 const ASM = require('../generator/asm');
 
 const {
+  COMMENT,
   ASSIGNMENT_STATEMENT,
   REASSIGNMENT_STATEMENT,
   RETURN_STATEMENT,
@@ -84,6 +87,7 @@ const createIfElse = (eqExpr, ifStatements, elseStatements) => ({ type: IF_ELSE_
 const createNegatedExpression = value => ({ type: NEGATED_EXPR, value });
 const createLabelReference = value => ({ type: LABEL_REFERENCE, value });
 const createReturn = value => ({ type: RETURN_STATEMENT, value });
+const createComment = value => ({ type: COMMENT, value });
 
 const identifierP = regex(/^[a-zA-Z_][a-zA-Z0-9_]*/).map(createIdentifier);
 
@@ -97,6 +101,15 @@ const indexedStackVariableP = recursiveParser(() => sequencedNamed([
   ['name', stackVariableP],
   ['index', strictSquareBracketed(exprP)]
 ]).map(({name, index}) => createIndexedStackVariable(name, index)));
+
+const commentP = sequencedNamed([
+  regex(/^[ \t\r]*\/\//),
+  ['comment', everythingUntil(choice([
+    char('\n'),
+    endOfInput
+  ]))],
+  regex(/^[ \t\r]*/)
+]).map(({comment}) => createComment(comment));
 
 const binaryExprP = (operator, type) => recursiveParser(() => doParser(function* () {
   yield regex(/^[ \t\n]*\([ \t\n]*/);
@@ -231,6 +244,7 @@ const returnP = recursiveParser(() => doParser(function* () {
 }));
 
 const statementP = recursiveParser(() => choice([
+  commentP,
   returnP,
   whileP,
   ifP,
@@ -305,18 +319,30 @@ const functionCallP = doParser(function* () {
 
 const functionsP = many(takeRight(regex(/^[ \t\n]*/))(functionP));
 
+const programP = many(choice([
+  takeRight(regex(/^[ \t\n]*/))(functionP),
+  takeRight(regex(/^[ \t\n]*/))(commentP)
+]));
+
 const src = `
+// This is actually the second function
 fn secondFn () {
   return ~(firstFn(0x03, 0x04, 0x05) + 0x04);
 }
 
+
+// This is the main entry point
 fn main () {
   return ((firstFn(0, 1, 2) + secondFn()) << 2);
 }
 
+// This is the first function
 fn firstFn (a, b, c) {
+  // First check if a is bigger than b
   if ((a > b)) {
     return (a + b);
+
+  // If not we're gonna do something else...
   } else {
     if ((b > c)) {
       return (b + c);
@@ -330,12 +356,12 @@ fn firstFn (a, b, c) {
 console.log(src + '\n\n');
 
 // console.log(
-functionsP
+programP
   .run(src)
   // .map(console.log)
   // .leftMap(console.log)
   .map(xs => {
-    const foundMainFn = xs.some(fn => fn.name.value === 'main');
+    const foundMainFn = xs.some(fn => fn.type === FUNCTION && fn.name.value === 'main');
 
     if (!foundMainFn) {
       console.log(`Warning: No main function found`);
