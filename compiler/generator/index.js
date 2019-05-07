@@ -1,4 +1,5 @@
 const {
+  SECTION_BLOCK,
   COMMENT,
   FUNCTION,
   FUNCTION_CALL,
@@ -30,6 +31,7 @@ const {
 } = require('../constants');
 
 const Scope = require('./scope');
+const ASM = require('./asm');
 
 const randomId = () => Math.random().toString(16).slice(2);
 
@@ -94,8 +96,39 @@ const jumpExpression = (label, expr, scope, asm) => {
   return asm;
 }
 
+$.program = ({sections, code}) => {
+  const scope = new Scope();
+  const asm = new ASM();
+
+  sections.forEach(section => $.section(section, scope, asm));
+
+  asm.add('.code\n');
+
+  const hasMainFn = code.some(expr => expr.type === FUNCTION && expr.name.value === 'main');
+
+  if (hasMainFn) {
+    asm.comment('Program Entry Point');
+    asm.add('push 0x0');
+    asm.add('push {main}');
+    asm.add('call');
+    asm.add('halt');
+    asm.blankLine();
+  }
+
+  code.forEach(expr => $.expr(expr, scope, asm));
+
+  if (!hasMainFn) {
+    asm.add('halt');
+  }
+
+  asm.blankLine();
+
+  return asm;
+};
+
 $.expr = (expr, scope, asm) => {
   switch (expr.type) {
+    case SECTION_BLOCK:           return $.section(expr, scope, asm);
     case COMMENT:                 return $.comment(expr, scope, asm);
     case LABEL_REFERENCE:         return $.labelReference(expr, scope, asm);
     case LITERAL_INT:             return $.literalInt(expr, scope, asm);
@@ -119,6 +152,37 @@ $.expr = (expr, scope, asm) => {
     case NOT_EXPR:                return $.logicalNot(expr, scope, asm);
   }
   throw new Error(`Unrecognised expression type! ${JSON.stringify(expr, null, '  ')}`);
+};
+
+$.section = (expr, scope, asm) => {
+  asm.add(`.section ${expr.name.value} 0x${expr.startAddress.value.toString(16)}`);
+  asm.indent();
+
+  expr.value.forEach(dataLine => {
+    let asmLine = `${dataLine.name.value} ${dataLine.dataType} `;
+
+    switch (dataLine.dataType) {
+      case 'words':
+      case 'bytes': {
+        asmLine += dataLine.value.map(({value}) => `0x${value.toString(16)}`).join(', ');
+        break;
+      }
+      case 'ascii': {
+        asmLine += dataLine.value;
+        break;
+      }
+      case 'buffer': {
+        asmLine += `0x${dataLine.value.value.toString(16)}`;
+        break;
+      }
+    }
+
+    asm.add(asmLine);
+  });
+
+  asm.unindent();
+
+  return asm;
 };
 
 $.comment = (expr, scope, asm) => {
@@ -306,4 +370,4 @@ $.return = (expr, scope, asm) => {
   return asm;
 };
 
-module.exports = $.expr;
+module.exports = $;

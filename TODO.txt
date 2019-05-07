@@ -3,6 +3,10 @@
 [!] As a principle, operations that act on values on the top of the stack should *consume* those values. That is, they should not be able to see a value they have not popped, as this leads to weird, non-intuitive bugs.
 Exceptions here are ones that copy parts of memory.
 
+- Tests
+  - machine
+  - assembler
+  - compiler
 - Comment primary parts of project - parser, machine etc
 - Memory bank support
 - C-like language that can be used to write code for the VirtualMachineConsole

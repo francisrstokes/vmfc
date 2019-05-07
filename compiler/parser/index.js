@@ -1,39 +1,3 @@
-const fs = require('fs');
-const path = require('path');
-const {
-  everythingUntil,
-  str,
-  regex,
-  choice,
-  digits,
-  char,
-  possibly,
-  Parser,
-  recursiveParser,
-  takeLeft,
-  takeRight,
-  many,
-  sepBy,
-  between,
-  tapParser,
-  fail,
-  endOfInput
-} = require('arcsecond');
-const {
-  doParser,
-  spaces,
-  sequencedNamed
-} = require('../../assembler/parser/common');
-
-const debuggingParser = tapParser(([index, str, last]) => {
-  console.log(`Last value: ${last}`);
-  console.log(`The rest: ${str.slice(index)}`);
-})
-
-const translateToAssembly = require('../generator');
-const Scope = require('../generator/scope');
-const ASM = require('../generator/asm');
-
 const {
   COMMENT,
   ASSIGNMENT_STATEMENT,
@@ -52,6 +16,9 @@ const {
   NOT_EXPR,
   FUNCTION,
   FUNCTION_CALL,
+
+  SECTION_BLOCK,
+  DATA_LINE,
   WHILE_BLOCK,
   IF_ELSE_BLOCK,
   IDENTIFIER,
@@ -68,7 +35,43 @@ const {
   NOT_EQUAL_TO_EXPR,
 } = require('../constants');
 
+const {
+  sepBy1,
+  letters,
+  everythingUntil,
+  str,
+  choice,
+  regex,
+  digits,
+  char,
+  possibly,
+  Parser,
+  recursiveParser,
+  takeLeft,
+  takeRight,
+  many,
+  sepBy,
+  between,
+  tapParser,
+  fail,
+  endOfInput,
+  toValue
+} = require('arcsecond');
+
+const {
+  doParser,
+  spaces,
+  sequencedNamed
+} = require('../../assembler/parser/common');
+
+const debuggingParser = tapParser(([index, str, last]) => {
+  console.log(`Last value: ${last}`);
+  console.log(`The rest: ${str.slice(index)}`);
+});
+
+const arbitrarySpace = regex(/^[ \t\n\r]*/);
 const spaceSurrounded = between (possibly(spaces)) (possibly(spaces));
+const arbitrarySpaceSurrounded = between (possibly(arbitrarySpace)) (possibly(arbitrarySpace));
 const bracketed = between (spaceSurrounded(char('('))) (spaceSurrounded(char(')')));
 const strictBracketed = between (char('(')) (char(')'));
 const strictCurlyBracketed = between (char('{')) (char('}'));
@@ -88,6 +91,10 @@ const createNegatedExpression = value => ({ type: NEGATED_EXPR, value });
 const createLabelReference = value => ({ type: LABEL_REFERENCE, value });
 const createReturn = value => ({ type: RETURN_STATEMENT, value });
 const createComment = value => ({ type: COMMENT, value });
+const createDataLine = (name, type, value) => ({ type: DATA_LINE, name,  dataType: type, value });
+const createSection = (name, value, startAddress) => ({ type: SECTION_BLOCK, name, value, startAddress });
+
+const createProgram = (sections, code) => ({ sections, code });
 
 const identifierP = regex(/^[a-zA-Z_][a-zA-Z0-9_]*/).map(createIdentifier);
 
@@ -317,84 +324,67 @@ const functionCallP = doParser(function* () {
   return Parser.of(createFunctionCall(identifier, args));
 });
 
-const functionsP = many(takeRight(regex(/^[ \t\n]*/))(functionP));
+const dataLineP = doParser(function* () {
+  const name = yield identifierP;
+  yield regex(/^[ \t\r]+/);
 
-const programP = many(choice([
-  takeRight(regex(/^[ \t\n]*/))(functionP),
-  takeRight(regex(/^[ \t\n]*/))(commentP)
-]));
+  let value;
 
-const src = `
-// This is actually the second function
-fn secondFn () {
-  return ~(firstFn(0x03, 0x04, 0x05) + 0x04);
-}
+  const type = yield letters;
+  yield arbitrarySpace;
 
-
-// This is the main entry point
-fn main () {
-  return ((firstFn(0, 1, 2) + secondFn()) << 2);
-}
-
-// This is the first function
-fn firstFn (a, b, c) {
-  // First check if a is bigger than b
-  if ((a > b)) {
-    return (a + b);
-
-  // If not we're gonna do something else...
-  } else {
-    if ((b > c)) {
-      return (b + c);
+  switch (type) {
+    case 'bytes':
+    case 'words': {
+      value = yield sepBy1
+        (arbitrarySpaceSurrounded(char(',')))
+        (intP);
+      yield regex(/^[ \r\t\n]*;/);
+      break;
+    }
+    case 'ascii': {
+      value = yield everythingUntil(char('\n'));
+      break;
+    }
+    case 'buffer': {
+      value = yield intP;
+      yield regex(/^[ \r\t\n]*;/);
+      break;
+    }
+    default: {
+      return fail(`Unrecognized section data type '${type}'`);
     }
   }
-  return ((a + b) + c);
-}
 
-`
+  yield arbitrarySpace;
+  return Parser.of(createDataLine(name, type, value));
+});
 
-console.log(src + '\n\n');
+const sectionP = recursiveParser(() => doParser(function* () {
+  yield regex(/^[ \t\n\r]*section[ \t\r]+/);
+  const name = yield identifierP;
 
-// console.log(
-programP
-  .run(src)
-  // .map(console.log)
-  // .leftMap(console.log)
-  .map(xs => {
-    const foundMainFn = xs.some(fn => fn.type === FUNCTION && fn.name.value === 'main');
+  yield regex(/^[ \t\r]+/);
+  const startAddress = yield intP;
 
-    if (!foundMainFn) {
-      console.log(`Warning: No main function found`);
-    }
+  yield regex(/^[ \t\r]+\{[ \n\t\r]*/);
 
-    const scope = new Scope();
-    const asm = new ASM();
-    xs.forEach(x => translateToAssembly(x, scope, asm));
-    return asm;
-  })
-  .map(x => {
-    const finalCode = `
-.code
+  const dataLines = yield many(dataLineP);
 
-;; Generated by VMFCompiler
-push 0x0
-push {main}
-call
-halt
+  yield regex(/^[ \n\t\r]*\}[ \n\t\r]*/);
 
-${x.getCode()}
-`;
-    return finalCode;
-  })
-  .map(console.log)
-// )
-// console.log(
-// const s = new Scope();
-// s.addVariable('s', 'ASSIGNMENT');
-// whileP
-//   .run(src)
-//   .map(x => translateToAssembly(x, s, new ASM()))
-//   .map(x => console.log(x.getCode()))
-// )
+  return Parser.of(createSection(name, dataLines, startAddress));
+}));
 
-debugger;
+const programP = doParser(function* () {
+  yield arbitrarySpace;
+  const sections = yield many(sectionP);
+  const code = yield many(choice([
+    takeRight(regex(/^[ \t\n]*/))(functionP),
+    takeRight(regex(/^[ \t\n]*/))(commentP)
+  ]));
+
+  return Parser.of(createProgram(sections, code));
+});
+
+module.exports = input => toValue(programP.run(input));

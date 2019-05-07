@@ -1,9 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-const parser = require('./parser');
-const validator = require('./validator');
-const transformer = require('./transformer');
-const generator = require('./generator');
+const pipeline = require('./pipeline');
 
 if (process.argv.length < 3) {
   console.log(`Usage: assemble <asm file>`);
@@ -19,9 +16,7 @@ fs.readFile(filepath, 'utf8', (err, file) => {
     process.exit(1);
   }
 
-  const ast = transformer(parser(file));
-  validator(ast);
-  const binary = generator(ast);
+  const binary = pipeline(file);
 
   fs.writeFile(assemblyPath, binary, err => {
     if (err) {

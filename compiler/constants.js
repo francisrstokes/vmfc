@@ -25,6 +25,9 @@ const XOR_EXPR = 'xor_expr';
 const NOT_EXPR = 'not_expr';
 
 
+const SECTION_BLOCK = 'section_block';
+const DATA_LINE = 'data_line';
+
 const FUNCTION = 'function';
 const FUNCTION_CALL = 'function_call';
 const WHILE_BLOCK = 'while_block';
@@ -60,6 +63,8 @@ module.exports = {
   FUNCTION,
   FUNCTION_CALL,
   WHILE_BLOCK,
+  SECTION_BLOCK,
+  DATA_LINE,
   IF_ELSE_BLOCK,
   IDENTIFIER,
   LITERAL_INT,
