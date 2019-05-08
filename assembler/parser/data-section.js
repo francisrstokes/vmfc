@@ -1,17 +1,16 @@
 const {
   str,
-  char,
   sequenceOf,
   whitespace,
   possibly,
   many,
   many1,
   choice,
-  namedSequenceOf,
   sepBy,
   everythingUntil,
   letters,
-  Parser
+  Parser,
+  regex,
 } = require('arcsecond');
 const {
   sequencedNamed,
@@ -20,8 +19,9 @@ const {
   hex16,
   doParser,
   comment,
-  whitespaceSurrounded
 } = require('./common');
+
+const whitespacedComma = regex(/^[ \t]*,[ \t]*/);
 
 const dataLineSpecific = doParser(function* () {
   const type = yield letters;
@@ -30,11 +30,11 @@ const dataLineSpecific = doParser(function* () {
   let data;
   switch (type) {
     case 'bytes': {
-      data = yield sepBy (whitespaceSurrounded(char(','))) (hex16);
+      data = yield sepBy (whitespacedComma) (hex16);
       break;
     }
     case 'words': {
-      data = yield sepBy (whitespaceSurrounded(char(','))) (hex16);
+      data = yield sepBy (whitespacedComma) (hex16);
       break;
     }
     case 'ascii': {
@@ -46,16 +46,20 @@ const dataLineSpecific = doParser(function* () {
       break;
     }
   }
+
   return Parser.of({type, data});
 });
 
-const dataLine = namedSequenceOf([
-  ['_', whitespace],
-  ['name', letters],
-  ['_', Whitespace],
-  ['data', dataLineSpecific],
-  ['_', newline]
-]).map(({name, data: {type, data}}) => ({name, type, data}))
+const dataLine = doParser(function* () {
+  yield regex(/^[ \t]*/);
+  const name = yield  letters;
+  yield Whitespace;
+  const {type, data} = yield dataLineSpecific;
+  yield regex(/^[ \r\t\n]+/);
+
+  return Parser.of({name, type, data});
+});
+
 
 const sectionParser = sequencedNamed([
   whitespace,
